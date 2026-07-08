@@ -19,6 +19,23 @@ test('buildSearchUrl slugs "City, Country" with a double dash', () => {
   assert.equal(url, 'https://www.airbnb.com/s/Paris--France/homes?checkin=2027-01-10&checkout=2027-01-15&adults=2');
 });
 
+test('parseListingDetails extracts top amenities and description snippet', () => {
+  const html = `<html><head>
+    <script type="application/ld+json">${JSON.stringify({
+      "@type": "LodgingBusiness",
+      name: 'Charming loft',
+      description: 'A lovely stay &amp; more. It is located right in the heart of Paris, making it easy to walk to cafes and museums.',
+      amenityFeature: [
+        { "@type": "LocationFeatureSpecification", "name": "Wifi" },
+        { "@type": "LocationFeatureSpecification", "name": "Pool" },
+        { "@type": "LocationFeatureSpecification", "name": "Fire extinguisher" }
+      ]
+    })}</script></head></html>`;
+  const d = parseListingDetails(html);
+  assert.deepEqual(d.topAmenities, ['Wifi', 'Pool']);
+  assert.equal(d.descriptionSnippet, 'A lovely stay & more. It is located right in the heart of Paris, making it easy to walk to cafes and museums.');
+});
+
 test('buildSearchUrl handles multi-word cities', () => {
   const url = buildSearchUrl({ location: 'New York, NY', checkin: '2027-01-10', checkout: '2027-01-15' });
   assert.ok(url.startsWith('https://www.airbnb.com/s/New-York--NY/homes?'));

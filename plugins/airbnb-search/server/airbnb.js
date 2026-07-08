@@ -255,12 +255,16 @@ function decodeHtmlEntities(s) {
   return String(s).replace(/&(?:amp|quot|#39|lt|gt|#x27|nbsp);/g, (m) => HTML_ENTITIES[m] || m);
 }
 
+const TOP_AMENITIES = new Set([
+  'Wifi', 'Air conditioning', 'Kitchen', 'Pool', 'Hot tub', 'Free parking', 'Washer', 'Dryer', 'Heating', 'Gym'
+]);
+
 /**
  * Pull listing details out of a rooms/<id> page: JSON-LD first (name,
  * description, images, aggregate rating), og: meta tags as fallback.
  */
 function parseListingDetails(html) {
-  const out = { name: '', description: '', images: [], rating: null, reviewsCount: null };
+  const out = { name: '', description: '', images: [], rating: null, reviewsCount: null, topAmenities: [] };
 
   for (const m of html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/gs)) {
     let data;
@@ -282,6 +286,14 @@ function parseListingDetails(html) {
         if (Number.isFinite(rating)) out.rating = rating;
         if (Number.isFinite(reviews)) out.reviewsCount = reviews;
       }
+      if (node.amenityFeature) {
+        const features = Array.isArray(node.amenityFeature) ? node.amenityFeature : [node.amenityFeature];
+        for (const feat of features) {
+          if (feat && typeof feat.name === 'string' && TOP_AMENITIES.has(feat.name)) {
+            out.topAmenities.push(feat.name);
+          }
+        }
+      }
     }
   }
 
@@ -300,6 +312,14 @@ function parseListingDetails(html) {
 
   out.description = decodeHtmlEntities(out.description).trim().slice(0, 4000);
   out.images = [...new Set(out.images)].slice(0, 8);
+  out.topAmenities = [...new Set(out.topAmenities)];
+
+  let snip = out.description.replace(/\s+/g, ' ').trim();
+  if (snip.length > 110) {
+    snip = snip.substring(0, 107).trim() + '...';
+  }
+  out.descriptionSnippet = snip;
+
   return out;
 }
 
