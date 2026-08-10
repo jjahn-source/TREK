@@ -22,14 +22,15 @@ import { useAddonStore } from '../../store/addonStore'
 import { useSaveToCollectionStore } from '../../store/saveToCollectionStore'
 import { placeToSaveTarget } from '../Collections/saveTarget'
 import { useTranslation } from '../../i18n'
-import { isDayInAccommodationRange, getAccommodationAnchors, getDayBookendHotels } from '../../utils/dayOrder'
+import { isDayInAccommodationRange, getAccommodationAnchors, getDayBookendHotels, shouldDrawMorningLeg, shouldDrawEveningLeg } from '../../utils/dayOrder'
 import {
   TRANSPORT_TYPES, parseTimeToMinutes, getSpanPhase, getDisplayTimeForDay, getTransportRouteEndpoints,
   getTransportForDay as _getTransportForDay, getMergedItems as _getMergedItems,
   type MergedItem,
 } from '../../utils/dayMerge'
-import { formatDate, formatTime, dayTotalCost, splitReservationDateTime } from '../../utils/formatters'
+import { formatDate, formatTime, dayTotalCost, formatMoneySum, splitReservationDateTime } from '../../utils/formatters'
 import { useDayNotes } from '../../hooks/useDayNotes'
+import { useExchangeRates } from '../../hooks/useExchangeRates'
 import { RES_ICONS, getNoteIcon } from './DayPlanSidebar.constants'
 import { RouteConnector, HotelRouteConnector } from './DayPlanSidebarRouteConnector'
 import { MobileAddPlaceButton } from './DayPlanSidebarMobileAddPlaceButton'
@@ -68,6 +69,8 @@ interface DayPlanSidebarProps {
   reservations?: Reservation[]
   visibleConnectionIds?: number[]
   onToggleConnection?: (reservationId: number) => void
+  allConnectionsShown?: boolean
+  onToggleAllConnections?: () => void
   externalTransportDetail?: Reservation | null
   onExternalTransportDetailHandled?: () => void
   onAddReservation: (dayId: number) => void
@@ -96,9 +99,12 @@ interface DayPlanSidebarProps {
   onScrollTopChange?: (top: number) => void
   /** Mobile: show the route tools footer (Route toggle / Optimize / travel profile) on expanded days, since selecting a day closes the sheet */
   showRouteToolsWhenExpanded?: boolean
-  /** Mobile: drag & drop reorder is disabled (touch-scroll hijack, #1432); the
-   *  grip handle is hidden and the arrow reorder buttons take over instead. */
   isMobile?: boolean
+  /** Coarse primary pointer. Drag & drop reorder is disabled here (it hijacks the
+   *  touch-scroll gesture, #1432); the grip handle is hidden and the arrow reorder
+   *  buttons take over instead. Distinct from isMobile, which is width-based — a
+   *  tablet is a wide touch device and needs both. */
+  isTouch?: boolean
 }
 
 /**
@@ -118,6 +124,8 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   reservations = [],
   visibleConnectionIds = [],
   onToggleConnection,
+  allConnectionsShown = false,
+  onToggleAllConnections,
   externalTransportDetail,
   onExternalTransportDetailHandled,
   onAddReservation,
@@ -144,7 +152,9 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   onScrollTopChange,
   showRouteToolsWhenExpanded = false,
   isMobile = false,
+  isTouch = false,
   } = props
+  const dragDisabled = isMobile || isTouch
   const toast = useToast()
   const { t, language, locale } = useTranslation()
   const ctxMenu = useContextMenu()
@@ -235,6 +245,12 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   }, [selectedAssignmentId, selectedPlaceId])
 
   const currency = trip?.currency || 'EUR'
+  // Cost totals render in the user's display currency (falling back to the
+  // trip's), converting foreign-currency place prices via live FX rates —
+  // same base resolution as BookingCostsSection / the Costs panel (#1561).
+  const displayCurrency = useSettingsStore(s => s.settings.default_currency)
+  const costBase = (displayCurrency || currency).toUpperCase()
+  const { rates: fxRates } = useExchangeRates(costBase)
 
   // Drag-Daten aus dataTransfer, Ref oder window lesen (dataTransfer geht bei Re-Render verloren)
   const getDragData = (e) => {
@@ -455,9 +471,11 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
             cur = []
             curHasPlace = false
             if (to) cur.push({ id: r.id, lat: to.lat, lng: to.lng })
-          } else if (cur.length > 0) {
+          } else if (cur.length > 0 && !(r.type === 'car' && getSpanPhase(r, dayId) === 'middle')) {
             // No location: ignore for routing, but attribute the through-leg to the
             // booking so its distance/duration shows under it (purely cosmetic).
+            // Not for a car rental's middle days though — that row isn't rendered
+            // in the timeline, so re-keying would drop the leg entirely (#1504).
             cur[cur.length - 1] = { ...cur[cur.length - 1], id: r.id }
           }
         }
@@ -475,22 +493,23 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
       const endHotel = bookends?.evening
       // Waypoints include transport endpoints (a car return, a taxi/train arrival), so the hotel
       // legs connect even when the day starts or ends with a booking rather than a place. Track
-      // whether each is a place so we can skip a hotel↔transport leg that isn't real: on a day-1
-      // arrival the check-in hotel never drove to the departure airport (#1321).
-      const wayPts: { lat: number; lng: number; isPlace: boolean }[] = []
+      // whether each is a place and its time so the bookend decision can drop a leg that isn't
+      // real: a check-in hotel never drove to a departure airport (#1321), and a place timed before
+      // check-in / after check-out means you weren't at the hotel then (#1465).
+      const wayPts: { lat: number; lng: number; isPlace: boolean; time: string | null }[] = []
       for (const it of merged) {
         if (it.type === 'place' && it.data.place?.lat && it.data.place?.lng) {
-          wayPts.push({ lat: it.data.place.lat, lng: it.data.place.lng, isPlace: true })
+          wayPts.push({ lat: it.data.place.lat, lng: it.data.place.lng, isPlace: true, time: it.data.place?.place_time ?? null })
         } else if (it.type === 'transport') {
           const { from, to } = getTransportRouteEndpoints(it.data, dayId)
-          if (from) wayPts.push({ lat: from.lat, lng: from.lng, isPlace: false })
-          if (to) wayPts.push({ lat: to.lat, lng: to.lng, isPlace: false })
+          if (from) wayPts.push({ lat: from.lat, lng: from.lng, isPlace: false, time: null })
+          if (to) wayPts.push({ lat: to.lat, lng: to.lng, isPlace: false, time: null })
         }
       }
       const firstWay = wayPts[0]
       const lastWay = wayPts[wayPts.length - 1]
-      const wantTop = !!(startHotel && firstWay && (firstWay.isPlace || bookends?.morningIsSleptHere))
-      const wantBottom = !!(endHotel && lastWay && (lastWay.isPlace || bookends?.eveningIsOvernight))
+      const wantTop = !!(startHotel && firstWay && bookends && day && shouldDrawMorningLeg(bookends, day, firstWay))
+      const wantBottom = !!(endHotel && lastWay && bookends && day && shouldDrawEveningLeg(bookends, day, lastWay))
       return { runs, startHotel, endHotel, firstWay, lastWay, wantTop, wantBottom }
     }
 
@@ -961,10 +980,13 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     setDraggingId(null)
   }
 
-  const totalCost = useMemo(() => days.reduce((s, d) => {
-    const da = assignments[String(d.id)] || []
-    return s + da.reduce((s2, a) => s2 + (Number(a.place?.price) || 0), 0)
-  }, 0), [days, assignments])
+  const totalCostLabel = useMemo(() => {
+    const entries = days.flatMap(d => (assignments[String(d.id)] || []).map(a => ({
+      amount: Number(a.place?.price) || 0,
+      currency: a.place?.currency || currency,
+    })))
+    return formatMoneySum(entries, costBase, locale, fxRates)
+  }, [days, assignments, currency, costBase, locale, fxRates])
 
   // Bester verfügbarer Standort für Wetter: zugewiesene Orte zuerst, dann beliebiger Reiseort
   const anyGeoAssignment = Object.values(assignments).flatMap(da => da).find(a => a.place?.lat && a.place?.lng)
@@ -996,6 +1018,8 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     reservations,
     visibleConnectionIds,
     onToggleConnection,
+    allConnectionsShown,
+    onToggleAllConnections,
     externalTransportDetail,
     onExternalTransportDetailHandled,
     onAddReservation,
@@ -1024,6 +1048,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     onScrollTopChange,
     showRouteToolsWhenExpanded,
     isMobile,
+    dragDisabled,
     toast,
     t,
     language,
@@ -1092,6 +1117,8 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     initedTransportIds,
     lastAutoScrolledIdRef,
     currency,
+    costBase,
+    fxRates,
     getDragData,
     prevDayCount,
     toggleDay,
@@ -1116,7 +1143,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     handleOptimize,
     handleDropOnDay,
     handleDropOnRow,
-    totalCost,
+    totalCostLabel,
     anyGeoAssignment,
     anyGeoPlace,
     expandedRouteDayIds,
@@ -1162,6 +1189,8 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     reservations,
     visibleConnectionIds,
     onToggleConnection,
+    allConnectionsShown,
+    onToggleAllConnections,
     externalTransportDetail,
     onExternalTransportDetailHandled,
     onAddReservation,
@@ -1190,6 +1219,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     onScrollTopChange,
     showRouteToolsWhenExpanded,
     isMobile,
+    dragDisabled,
     toast,
     t,
     language,
@@ -1258,6 +1288,8 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     initedTransportIds,
     lastAutoScrolledIdRef,
     currency,
+    costBase,
+    fxRates,
     getDragData,
     prevDayCount,
     toggleDay,
@@ -1282,7 +1314,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     handleOptimize,
     handleDropOnDay,
     handleDropOnRow,
-    totalCost,
+    totalCostLabel,
     anyGeoAssignment,
     anyGeoPlace,
     expandedRouteDayIds,
@@ -1299,6 +1331,8 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         categories={categories}
         assignments={assignments}
         reservations={reservations}
+        allConnectionsShown={allConnectionsShown}
+        onToggleAllConnections={onToggleAllConnections}
         dayNotes={dayNotes}
         t={t}
         locale={locale}
@@ -1325,7 +1359,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           const isSelected = selectedDayId === day.id
           const isExpanded = expandedDays.has(day.id)
           const da = getDayAssignments(day.id)
-          const cost = dayTotalCost(day.id, assignments, currency)
+          const cost = dayTotalCost(day.id, assignments, costBase, currency, locale, fxRates)
           const formattedDate = formatDate(day.date, locale)
           const loc = da.find(a => a.place?.lat && a.place?.lng)
           // Route tools normally need 2+ stops, but a single located place is still
@@ -1654,9 +1688,10 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                         return (
                           <React.Fragment key={`place-${assignment.id}`}>
                           <div
-                            draggable={canEditDays && !isMobile}
+                            className="dp-row"
+                            draggable={canEditDays && !dragDisabled}
                             onDragStart={e => {
-                              if (!canEditDays || isMobile) { e.preventDefault(); return }
+                              if (!canEditDays || dragDisabled) { e.preventDefault(); return }
                               e.dataTransfer.setData('assignmentId', String(assignment.id))
                               e.dataTransfer.setData('fromDayId', String(day.id))
                               e.dataTransfer.effectAllowed = 'move'
@@ -1751,7 +1786,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                               opacity: isDraggingThis ? 0.4 : 1,
                             }}
                           >
-                            {canEditDays && !isMobile && <div className="dp-grip" style={{ flexShrink: 0, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', opacity: 0.3, transition: 'opacity 0.15s', cursor: 'grab' }}>
+                            {canEditDays && !dragDisabled && <div className="dp-grip" style={{ flexShrink: 0, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', opacity: 0.3, transition: 'opacity 0.15s', cursor: 'grab' }}>
                               <GripVertical size={13} strokeWidth={1.8} />
                             </div>}
                             <div
@@ -2011,9 +2046,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                               const key = inBottom ? `transport-after-${res.id}${ls}-${day.id}` : `transport-${res.id}${ls}-${day.id}`
                               if (dropTargetRef.current !== key) setDropTargetKey(key)
                             }}
-                            draggable={canEditDays && spanPhase !== 'middle' && !res.__leg && !isMobile}
+                            draggable={canEditDays && spanPhase !== 'middle' && !res.__leg && !dragDisabled}
                             onDragStart={e => {
-                              if (!canEditDays || spanPhase === 'middle' || res.__leg || isMobile) { e.preventDefault(); return }
+                              if (!canEditDays || spanPhase === 'middle' || res.__leg || dragDisabled) { e.preventDefault(); return }
                               // setData is required for the drag to start reliably (Firefox) and
                               // matches how place/note items initiate their drag.
                               e.dataTransfer.setData('reservationId', String(res.id))
@@ -2062,7 +2097,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                               opacity: draggingId === res.id ? 0.4 : spanPhase === 'middle' ? 0.65 : 1,
                             }}
                           >
-                            {canEditDays && spanPhase !== 'middle' && !res.__leg && !isMobile && (
+                            {canEditDays && spanPhase !== 'middle' && !res.__leg && !dragDisabled && (
                               <div className="dp-grip" style={{ flexShrink: 0, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', opacity: 0.3, transition: 'opacity 0.15s', cursor: 'grab' }}>
                                 <GripVertical size={13} strokeWidth={1.8} />
                               </div>
@@ -2179,8 +2214,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                       return (
                         <React.Fragment key={`note-${note.id}`}>
                         <div
-                          draggable={canEditDays && !isMobile}
-                          onDragStart={e => { if (!canEditDays || isMobile) { e.preventDefault(); return } e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.setData('fromDayId', String(day.id)); e.dataTransfer.effectAllowed = 'move'; dragDataRef.current = { noteId: String(note.id), fromDayId: String(day.id) }; setDraggingId(`note-${note.id}`) }}
+                          className="dp-row"
+                          draggable={canEditDays && !dragDisabled}
+                          onDragStart={e => { if (!canEditDays || dragDisabled) { e.preventDefault(); return } e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.setData('fromDayId', String(day.id)); e.dataTransfer.effectAllowed = 'move'; dragDataRef.current = { noteId: String(note.id), fromDayId: String(day.id) }; setDraggingId(`note-${note.id}`) }}
                           onDragEnd={() => { setDraggingId(null); setDropTargetKey(null); dragDataRef.current = null }}
                           onDragOver={e => { e.preventDefault(); e.stopPropagation(); if (dropTargetKey !== `note-${note.id}`) setDropTargetKey(`note-${note.id}`) }}
                           onDrop={e => {
@@ -2248,7 +2284,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                             transition: 'background 0.1s', cursor: 'grab', userSelect: 'none',
                           }}
                         >
-                          {canEditDays && !isMobile && <div className="dp-grip" style={{ flexShrink: 0, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', opacity: 0.3, transition: 'opacity 0.15s', cursor: 'grab' }}>
+                          {canEditDays && !dragDisabled && <div className="dp-grip" style={{ flexShrink: 0, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', opacity: 0.3, transition: 'opacity 0.15s', cursor: 'grab' }}>
                             <GripVertical size={13} strokeWidth={1.8} />
                           </div>}
                           <div style={{ width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: 'var(--bg-hover)', overflow: 'hidden' }}>
@@ -2358,11 +2394,19 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                             // Bookend the Google Maps route with the day's accommodation the
                             // same way the drawn map route does (routeBookends is null when
                             // "optimize from accommodation" is off), so hotels aren't dropped
-                            // from the exported route (#1372).
-                            const stops = getDayAssignments(day.id).map(a => a.place).filter(p => p?.lat != null && p?.lng != null) as { lat: number; lng: number }[]
-                            const morning = routeBookends?.morning?.place_lat != null && routeBookends?.morning?.place_lng != null
+                            // from the exported route (#1372) — but only when the leg is real:
+                            // no hotel prepended before an early check-in-day stop, none appended
+                            // after a post-check-out stop (#1465).
+                            const dayStops = getDayAssignments(day.id).filter(a => a.place?.lat != null && a.place?.lng != null)
+                            const stops = dayStops.map(a => ({ lat: a.place!.lat!, lng: a.place!.lng! }))
+                            const firstStop = dayStops[0] ? { isPlace: true, time: dayStops[0].place?.place_time ?? null } : undefined
+                            const lastAssignment = dayStops[dayStops.length - 1]
+                            const lastStop = lastAssignment ? { isPlace: true, time: lastAssignment.place?.place_time ?? null } : undefined
+                            const drawMorning = !!routeBookends && shouldDrawMorningLeg(routeBookends, day, firstStop)
+                            const drawEvening = !!routeBookends && shouldDrawEveningLeg(routeBookends, day, lastStop)
+                            const morning = drawMorning && routeBookends?.morning?.place_lat != null && routeBookends?.morning?.place_lng != null
                               ? { lat: routeBookends.morning.place_lat, lng: routeBookends.morning.place_lng } : null
-                            const evening = routeBookends?.evening?.place_lat != null && routeBookends?.evening?.place_lng != null
+                            const evening = drawEvening && routeBookends?.evening?.place_lat != null && routeBookends?.evening?.place_lng != null
                               ? { lat: routeBookends.evening.place_lat, lng: routeBookends.evening.place_lng } : null
                             const url = generateGoogleMapsUrl([...(morning ? [morning] : []), ...stops, ...(evening ? [evening] : [])])
                             if (url) window.open(url, '_blank', 'noopener,noreferrer')
@@ -2476,7 +2520,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
       />
 
       {/* Budget-Fußzeile */}
-      <DayPlanSidebarFooter totalCost={totalCost} currency={currency} t={t} />
+      <DayPlanSidebarFooter totalCostLabel={totalCostLabel} t={t} />
       <ContextMenu menu={ctxMenu.menu} onClose={ctxMenu.close} />
     </div>
   )

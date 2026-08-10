@@ -1,22 +1,32 @@
-# Budget Tracking
+# Costs (Budget Tracking)
 
 Track trip expenses by category, split costs between members, and visualize spending.
 
-<!-- TODO: screenshot: budget summary and expense list -->
+> **Renamed to Costs (v3.3.0, #1464):** This feature is now called **Costs** everywhere in the UI — the planner tab reads **Costs** and it is listed as **Costs** in Admin → Addons. Its internal addon id stays `budget`, which is why the permission is `budget_edit` and the MCP scopes are `budget:read` / `budget:write`.
 
-![Budget panel](assets/Budget.png)
+![Costs tab of a trip showing the You owe / You're owed / Outstanding / Total trip spend cards above the dated expense list, with the settle-up transfers and per-member balances in the right-hand column](assets/Costs.png)
+
+![Costs panel](assets/Budget.png)
 
 ## Where to find it
 
-Open the **Budget** tab inside the trip planner. The tab is only visible when the Budget addon is enabled.
+Open the **Costs** tab inside the trip planner. The tab is only visible when the Costs addon is enabled.
 
-> **Admin:** Budget is an addon. Enable it in [Admin-Addons](Admin-Addons).
+> **Admin:** Costs is an addon. Enable it in [Admin-Addons](Admin-Addons).
 
 ![Create Budget](assets/BudgetCreateBudget.gif)
 
 ## Currency
 
-Use the currency picker in the Budget toolbar to select one currency for the entire trip. 47 currencies are supported (EUR, USD, GBP, JPY, CHF, CZK, PLN, SEK, NOK, DKK, TRY, THB, AUD, CAD, NZD, BRL, MXN, INR, IDR, MYR, PHP, SGD, KRW, CNY, HKD, TWD, ZAR, AED, SAR, ILS, EGP, MAD, HUF, RON, BGN, HRK, ISK, RUB, UAH, KGS, BDT, LKR, VND, CLP, COP, PEN, ARS). All amounts are displayed in this currency.
+Costs is **multi-currency** (#551). Three settings are involved, and they do different jobs:
+
+- The **trip currency** (Trip → Edit trip) is the trip's accounting base. Every balance and settle-up is calculated in it.
+- Each **expense** carries **its own currency** — pick it in the expense modal and enter what the receipt says (a $100 dinner on a rouble trip is `100 USD`). It is converted into the trip currency at a rate **frozen when you save it**, so a settled debt doesn't reopen when the market moves.
+- Your **display currency** (Settings → General) converts what you *read* — totals, chart, balances — into one currency. It changes nothing that is stored. Left on **Trip currency** (the default), each trip is shown in its own currency.
+
+165 currencies are supported, with rates from [Frankfurter](https://frankfurter.dev) (no API key needed). When an item's currency differs from the display currency, the modal shows the converted amount alongside the rate (`1 {from} in {to}`), and the ledger row shows both (`$100.00 → 7 668,71 ₽`).
+
+> **Read [Currencies](Currencies) for the full picture** — how the three interact, what happens when you change a trip's currency, and which currency a public share link is shown in.
 
 ## Categories
 
@@ -70,9 +80,15 @@ When multiple members are assigned to expenses and there are outstanding debts b
 - Transfer flows: who pays whom and how much.
 - Net balances: each member's overall surplus or deficit.
 
+Balances are always netted in the **trip currency** and converted to your display currency once, at the end — so they stay stable even when the trip mixes currencies.
+
+A recorded payment carries **its own currency** too: settling a rouble debt with a euro transfer is normal, so the payment modal has a currency picker, and its rate is frozen when you record it. A payment made in another currency shows both amounts in the ledger (`$30.00 → 27,00 €`).
+
+![Add payment dialog with From and To member pickers, an amount field and a currency selector](assets/CostsSettleUp.png)
+
 ![Final Settlement](assets/BudgetFinalSettlement.gif)
 
-## Budget summary
+## Costs summary
 
 The right-hand column contains two widgets:
 
@@ -81,14 +97,15 @@ The right-hand column contains two widgets:
 
 ## Exporting
 
-Click the **CSV** button in the toolbar to download a semicolon-delimited file containing all categories and items. The columns exported are: Category, Name, Date, Total, Persons, Days, Per Person, Per Day, Per Person/Day, Note.
+Click **Export CSV** in the toolbar to download all expenses as a spreadsheet (restored in v3.3.0, #1500). The file is semicolon-delimited with a UTF-8 byte-order mark (so Excel opens it cleanly), rows sorted by date, and is named `costs-<trip>.csv`. The columns are: **Date, Name, Category, Amount, Currency, Amount (<display currency>), Note** — each expense shows both its original amount in its own currency and the converted amount in your display currency.
 
 ## Permissions
 
-All write operations (adding/editing/deleting items and categories, changing currency) require the `budget_edit` permission.
+All write operations (adding/editing/deleting items and categories, and an expense's currency) require the `budget_edit` permission. The **trip** currency lives on the trip itself, so changing that requires `trip_edit` instead.
 
 ## See also
 
+- [Currencies](Currencies)
 - [Admin-Addons](Admin-Addons)
 - [Reservations-and-Bookings](Reservations-and-Bookings)
 - [Trip-Planner-Overview](Trip-Planner-Overview)

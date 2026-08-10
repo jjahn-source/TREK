@@ -27,9 +27,11 @@ beforeEach(() => {
   db = new Database(':memory:');
   db.exec(`
     CREATE TABLE plugins (id TEXT PRIMARY KEY, name TEXT, description TEXT, type TEXT, icon TEXT, version TEXT,
-      api_version INTEGER, min_trek_version TEXT, permissions TEXT, capabilities TEXT DEFAULT '{}', dependencies TEXT DEFAULT '{}', granted_permissions TEXT, status TEXT, config TEXT, updated_at TEXT);
+      api_version INTEGER, min_trek_version TEXT, trek_range TEXT, permissions TEXT, capabilities TEXT DEFAULT '{}', dependencies TEXT DEFAULT '{}', operator_egress INTEGER DEFAULT 0, granted_permissions TEXT, status TEXT, config TEXT, updated_at TEXT);
     CREATE TABLE plugin_settings_fields (plugin_id TEXT, field_key TEXT, label TEXT, input_type TEXT, placeholder TEXT, hint TEXT,
       required INTEGER, secret INTEGER, scope TEXT, options TEXT, oauth_config TEXT, sort_order INTEGER);
+    CREATE TABLE plugin_actions (plugin_id TEXT, action_key TEXT, label TEXT, hint TEXT, danger INTEGER, sort_order INTEGER,
+      PRIMARY KEY (plugin_id, action_key));
     CREATE TABLE plugin_error_log (id INTEGER PRIMARY KEY AUTOINCREMENT, plugin_id TEXT, level TEXT, message TEXT, ts TEXT);`);
 });
 afterEach(() => {
@@ -94,8 +96,60 @@ describe('discoverPlugins', () => {
     expect(discoverPlugins(db).skipped).toEqual(['native']);
   });
 
+  it('follows a symlinked dev-link plugin only when dev-link mode is on', () => {
+    const srcRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'disc-src-'));
+    const prev = process.env.TREK_PLUGINS_DEV_LINK;
+    try {
+      const src = path.join(srcRoot, 'linked');
+      fs.mkdirSync(path.join(src, 'server'), { recursive: true });
+      fs.writeFileSync(path.join(src, 'trek-plugin.json'), JSON.stringify({ id: 'linked', name: 'Linked', version: '1.0.0', type: 'integration', permissions: ['db:own'] }));
+      fs.writeFileSync(path.join(src, 'server', 'index.js'), 'module.exports={}');
+      fs.symlinkSync(src, path.join(codeRoot, 'linked'), 'junction'); // junction on Windows, symlink on POSIX
+
+      // Off (default): a stale dev-link symlink is not discovered or registered.
+      delete process.env.TREK_PLUGINS_DEV_LINK;
+      expect(discoverPlugins(db).discovered).toEqual([]);
+      expect(db.prepare("SELECT status FROM plugins WHERE id='linked'").get()).toBeUndefined();
+
+      // On: the dev-link is followed and registered inactive.
+      process.env.TREK_PLUGINS_DEV_LINK = '1';
+      expect(discoverPlugins(db).discovered).toEqual(['linked']);
+      expect(db.prepare("SELECT status FROM plugins WHERE id='linked'").get()).toMatchObject({ status: 'inactive' });
+    } finally {
+      if (prev === undefined) delete process.env.TREK_PLUGINS_DEV_LINK; else process.env.TREK_PLUGINS_DEV_LINK = prev;
+      fs.rmSync(srcRoot, { recursive: true, force: true });
+    }
+  });
+
   it('is a no-op when the plugins dir is absent', () => {
     process.env.TREK_PLUGINS_DIR = path.join(codeRoot, 'does-not-exist');
     expect(discoverPlugins(db)).toEqual({ discovered: [], skipped: [] });
+  });
+
+  describe('the TREK range', () => {
+    it('persists the range and its lower bound', () => {
+      writePlugin('ranged', { trek: '>=3.2.0 <4.0.0' });
+      discoverPlugins(db);
+      expect(db.prepare("SELECT trek_range, min_trek_version FROM plugins WHERE id='ranged'").get())
+        .toMatchObject({ trek_range: '>=3.2.0 <4.0.0', min_trek_version: '3.2.0' });
+    });
+
+    it('still registers a plugin that declares NO range — it must not vanish', () => {
+      // Discovery is a reconciler, not a gate: it only logs and skips on a throw and never
+      // touches the plugins row, so refusing here would leave an existing plugin's stale
+      // enabled=1 row to be spawned by the next boot — invisible AND running. The row is
+      // registered with a null range and the activation gate refuses it (TREK_VERSION_UNKNOWN).
+      writePlugin('rangeless', {});
+      expect(discoverPlugins(db).discovered).toEqual(['rangeless']);
+      expect(db.prepare("SELECT trek_range FROM plugins WHERE id='rangeless'").get()).toMatchObject({ trek_range: null });
+    });
+
+    it('refreshes the range on re-discovery, so a plugin that narrowed its support is caught', () => {
+      writePlugin('shrink', { trek: '>=3.0.0' });
+      discoverPlugins(db);
+      writePlugin('shrink', { trek: '>=3.0.0 <3.1.0' });
+      discoverPlugins(db);
+      expect(db.prepare("SELECT trek_range FROM plugins WHERE id='shrink'").get()).toMatchObject({ trek_range: '>=3.0.0 <3.1.0' });
+    });
   });
 });

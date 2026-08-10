@@ -4,8 +4,6 @@ Journey is a photo-first travel journal. Each journey is linked to one or more o
 
 > **Admin:** enable Journey in [Admin-Addons](Admin-Addons).
 
-<!-- TODO: screenshot: journal entries view with photos and mood indicators -->
-
 ![Journey screenshot](assets/Journey.png)
 
 ## What Journey is
@@ -50,6 +48,14 @@ On mobile, entries are displayed in a horizontal scrolling timeline of card thum
 ## Map view
 
 The journey detail page includes a map on the right (desktop) or an integrated map-timeline (mobile) showing all entry locations alongside the places from linked trips.
+
+![Journey detail page for "Autumn in Japan" with its cover header and day/place/entry/photo counts, the day-by-day timeline with Add Entry actions on the left, and the entry map on the right](assets/JourneyDetail.png)
+
+## Plugin entry rows
+
+Installed plugins can add extra rows to a journal entry card via the `journalEntryProvider` hook. A plugin returns rows (`label`, optional `value`, optional `url`) and TREK renders them natively under the entry — no iframe. Rows are additive and fail-safe: they require the Journey addon, the entry's journey is access-checked the same way as reading it, only http/https/mailto links are allowed, and a provider that errors or is slow is simply skipped.
+
+> **Plugins:** requires the `hook:journal-entry-provider` permission. See [Plugin-Development](Plugin-Development) for the hook contract.
 
 ## Public sharing
 

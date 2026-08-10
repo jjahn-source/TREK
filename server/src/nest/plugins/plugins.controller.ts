@@ -1,12 +1,36 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpException, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpException, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Request } from 'express';
 import { PluginsService } from './plugins.service';
 import { PluginRuntimeService, PluginConsentRequired, PluginDependencyError } from './plugin-runtime.service';
 import { DependencyCycleError } from './dependencies';
-import { PluginRegistryService } from './registry/registry.service';
+import { PluginRegistryService, RegistryError } from './registry/registry.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { getClientIp } from '../../services/auditLog';
 import { pluginsEnabled } from './kill-switch';
+import { devLinkEnabled } from './dev-link';
+
+/**
+ * Flatten a registry/install failure into the error envelope — CARRYING THE CODE.
+ *
+ * The code is the whole point: the admin UI offers the re-trust override only for
+ * SIGNATURE_KEY_CHANGED, and it must read that from a field, not by string-matching the
+ * message. Drop the code here and the client is left guessing from prose, which sooner
+ * or later means offering "re-trust" on a signature that simply doesn't verify.
+ * TrekExceptionFilter passes a `{ error, code }` body through verbatim.
+ *
+ * A missing plugin is a 404, not a 400 — the request was well-formed, the thing just
+ * isn't there. Only `assertRetrustable` raises NOT_FOUND, so this is scoped to /retrust:
+ * install's "not in registry" carries no code and update throws a plain Error, and both
+ * keep their existing 400.
+ */
+function registryFailure(e: unknown, fallback: string): HttpException {
+  const code = e instanceof RegistryError ? e.code : undefined;
+  const error = e instanceof Error ? e.message : fallback;
+  return new HttpException(code ? { error, code } : { error }, code === 'NOT_FOUND' ? 404 : 400);
+}
 
 /**
  * /api/admin/plugins — admin-only plugin control surface (#plugins).
@@ -56,7 +80,7 @@ export class PluginsController {
       if (body.withDependencies) return await this.registry.installWithDependencies(body.id, body.constraint);
       return await this.registry.install(body.id, { version: body.version, constraint: body.constraint });
     } catch (e) {
-      throw new HttpException({ error: e instanceof Error ? e.message : 'install failed' }, 400);
+      throw registryFailure(e, 'install failed');
     }
   }
 
@@ -70,7 +94,25 @@ export class PluginsController {
     try {
       return await this.runtime.sideload(file.buffer);
     } catch (e) {
-      throw new HttpException({ error: e instanceof Error ? e.message : 'upload failed' }, 400);
+      throw registryFailure(e, 'upload failed'); // carries TREK_VERSION_INCOMPATIBLE
+    }
+  }
+
+  /**
+   * DEV-ONLY: register a plugin from a LOCAL built directory and hot-reload it
+   * against real data. Gated by TREK_PLUGINS_DEV_LINK on top of admin + kill-switch.
+   */
+  @Post('link')
+  @HttpCode(200)
+  async link(@Body() body: { path?: string }) {
+    if (!pluginsEnabled()) throw new HttpException({ error: 'Plugins are disabled by server configuration' }, 503);
+    if (!devLinkEnabled()) throw new HttpException({ error: 'Dev-link is disabled (set TREK_PLUGINS_DEV_LINK=1)' }, 403);
+    const dir = body?.path?.trim();
+    if (!dir) throw new HttpException({ error: 'path is required' }, 400);
+    try {
+      return await this.runtime.link(dir);
+    } catch (e) {
+      throw registryFailure(e, 'link failed'); // carries TREK_VERSION_INCOMPATIBLE
     }
   }
 
@@ -82,6 +124,28 @@ export class PluginsController {
   @Put(':id/config')
   updateConfig(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return { config: this.plugins.updateInstanceConfig(id, body || {}) };
+  }
+
+  /**
+   * Operator-supplied egress hosts. A plugin that talks to a SELF-HOSTED service can't
+   * name the operator's hostname in its manifest, so an admin adds it here — and the
+   * runtime re-spawns the plugin with the widened allow-list. Admin-only (this controller
+   * is admin-guarded): an end user can never widen a plugin's egress.
+   */
+  @Get(':id/egress-hosts')
+  egressHosts(@Param('id') id: string) {
+    return { supported: this.runtime.wantsOperatorEgress(id), hosts: this.runtime.operatorEgressHosts(id) };
+  }
+
+  @Put(':id/egress-hosts')
+  async setEgressHosts(@Param('id') id: string, @Body() body: { hosts?: unknown } = {}) {
+    if (!pluginsEnabled()) throw new HttpException({ error: 'Plugins are disabled by server configuration' }, 503);
+    const hosts = Array.isArray(body.hosts) ? body.hosts.map(String) : [];
+    try {
+      return { hosts: await this.runtime.setOperatorEgressHosts(id, hosts) };
+    } catch (e) {
+      throw new HttpException({ error: e instanceof Error ? e.message : 'Invalid hosts' }, 400);
+    }
   }
 
   @Post(':id/activate')
@@ -118,6 +182,28 @@ export class PluginsController {
     return { status: 'inactive' };
   }
 
+  /** DEV-ONLY: re-fork a dev-linked plugin so it picks up rebuilt code. */
+  @Post(':id/reload')
+  @HttpCode(200)
+  async reload(@Param('id') id: string) {
+    if (!pluginsEnabled()) throw new HttpException({ error: 'Plugins are disabled by server configuration' }, 503);
+    if (!devLinkEnabled()) throw new HttpException({ error: 'Dev-link is disabled (set TREK_PLUGINS_DEV_LINK=1)' }, 403);
+    try {
+      await this.runtime.reload(id);
+    } catch (e) {
+      // A rebuilt manifest that widened permissions must still re-consent, exactly
+      // like activate — surface the same codes so the admin UI reacts identically.
+      if (e instanceof PluginConsentRequired) {
+        throw new HttpException({ error: e.message, code: 'CONSENT_REQUIRED', newPermissions: e.newPermissions, newEgress: e.newEgress }, 409);
+      }
+      if (e instanceof PluginDependencyError) {
+        throw new HttpException({ error: e.message, code: e.code, ...e.detail }, 409);
+      }
+      throw new HttpException({ error: e instanceof Error ? e.message : 'reload failed' }, 400);
+    }
+    return { status: this.runtime.isActive(id) ? 'active' : 'inactive' };
+  }
+
   @Post(':id/update')
   @HttpCode(200)
   async update(@Param('id') id: string) {
@@ -125,7 +211,37 @@ export class PluginsController {
     try {
       return await this.runtime.update(id);
     } catch (e) {
-      throw new HttpException({ error: e instanceof Error ? e.message : 'update failed' }, 400);
+      throw registryFailure(e, 'update failed');
+    }
+  }
+
+  /**
+   * Re-trust a plugin whose author signing key ROTATED, and update it in the same call.
+   *
+   * This is the ONLY override of a signature refusal that exists, and it exists only for
+   * a changed key: a rotation has a benign explanation, a signature that doesn't verify
+   * does not. The scoping is enforced in the service (`assertRetrustable`), not by this
+   * route and not by the UI — calling this directly on a plugin with an INVALID signature
+   * is refused.
+   *
+   * `publicKey` is the full key the admin was SHOWN, echoed back so the server can refuse
+   * if the registry entry has been re-keyed again since the dialog rendered.
+   */
+  @Post(':id/retrust')
+  @HttpCode(200)
+  async retrust(
+    @Param('id') id: string,
+    @Body() body: { version?: string; publicKey?: string },
+    @CurrentUser() user: { id: number },
+    @Req() req: Request,
+  ) {
+    if (!pluginsEnabled()) throw new HttpException({ error: 'Plugins are disabled by server configuration' }, 503);
+    if (!body?.version) throw new HttpException({ error: 'version is required' }, 400);
+    if (!body?.publicKey) throw new HttpException({ error: 'publicKey is required' }, 400);
+    try {
+      return await this.runtime.retrust(id, body.version, body.publicKey, { userId: user?.id ?? null, ip: getClientIp(req) });
+    } catch (e) {
+      throw registryFailure(e, 'retrust failed');
     }
   }
 
@@ -144,6 +260,21 @@ export class PluginsController {
   @Get(':id/audit')
   audit(@Param('id') id: string) {
     return { audit: this.plugins.auditLog(id) };
+  }
+
+  @Get(':id/budget')
+  budget(@Param('id') id: string) {
+    return { budget: this.plugins.budget(id) };
+  }
+
+  /** GDPR portability: aggregate everything the installed plugins hold about one
+   * user, for an admin fulfilling a data-access request. Literal-prefixed path, so it
+   * never collides with the :id routes. */
+  @Get('user-data/:userId/export')
+  async exportUserData(@Param('userId') userId: string) {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) throw new HttpException({ error: 'invalid user id' }, 400);
+    return { userId: id, plugins: await this.runtime.exportUserData(id) };
   }
 
   @Delete(':id/errors')

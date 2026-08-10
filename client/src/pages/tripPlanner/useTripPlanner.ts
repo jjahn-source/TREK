@@ -5,7 +5,8 @@ import { useCanDo } from '../../store/permissionsStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { getCached, fetchPhoto } from '../../services/photoService'
 import { useToast } from '../../components/shared/Toast'
-import { Map, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train, Blocks } from 'lucide-react'
+import { Map, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train } from 'lucide-react'
+import { resolvePluginIcon } from '../../components/shared/PluginIcon'
 import { useTranslation, translateApiError } from '../../i18n'
 import { addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi, healthApi, airtrailApi, mapsApi, placesApi } from '../../api/client'
 import { parsedItemToDraft, isTransportItem, type BookingReviewDraft } from '../../components/Planner/parsedItemToDraft'
@@ -21,9 +22,17 @@ import { useRouteCalculation } from '../../hooks/useRouteCalculation'
 import { usePlaceSelection } from '../../hooks/usePlaceSelection'
 import { usePlannerHistory } from '../../hooks/usePlannerHistory'
 import { useAirtrailConnection } from '../../hooks/useAirtrailConnection'
+import { useIsTouch } from '../../hooks/useIsTouch'
 import { usePluginStore } from '../../store/pluginStore'
 import type { Accommodation, TripMember, Day, Place, Reservation } from '../../types'
+import { DEFAULT_MAP_LAT, DEFAULT_MAP_LNG, DEFAULT_MAP_ZOOM } from '../../constants/mapDefaults'
 import { resolvePoolAssignmentId } from './tripPlannerModel'
+import { isRoutableReservation } from '../../utils/reservationRoutes'
+import {
+  parseStoredConnections, resolveEffectiveConnections, resolveVisibleConnectionIds,
+  toggleConnectionId, toggleAllConnections as flipAllConnectionsMode,
+  type StoredConnections,
+} from '../../utils/connectionsVisibility'
 
 /**
  * Trip planner page logic — the big one. Owns the trip store wiring, addon
@@ -77,6 +86,16 @@ export function useTripPlanner() {
   const [allowedFileTypes, setAllowedFileTypes] = useState<string | null>(null)
   const [tripMembers, setTripMembers] = useState<TripMember[]>([])
 
+  // Re-fetch the trip roster so consumers (Costs participants, Collab, …) pick up a
+  // just-added guest or member without a full page reload.
+  const refreshMembers = useCallback(() => {
+    if (!tripId || isEffectivelyOffline()) return
+    tripsApi.getMembers(tripId).then(d => {
+      const all = [d.owner, ...(d.members || [])].filter(Boolean)
+      setTripMembers(all)
+    }).catch(() => {})
+  }, [tripId])
+
   const loadAccommodations = useCallback(() => {
     if (tripId) {
       accommodationRepo.list(tripId).then(d => setTripAccommodations(d.accommodations || [])).catch(() => {})
@@ -101,6 +120,9 @@ export function useTripPlanner() {
   const tripPagePlugins = allPlugins.filter(p => p.type === 'trip-page')
   const tripPluginIds = tripPagePlugins.map(p => p.id).join(',')
 
+  // A trip-page plugin may replace core tabs while it's active (its manifest names
+  // them; 'plan' is never replaceable) and may pick where its own tab sits.
+  const replacedTabs = new Set(tripPagePlugins.flatMap(p => p.tripPage?.replaces ?? []))
   const TRIP_TABS = [
     { id: 'plan', label: t('trip.tabs.plan'), icon: Map },
     { id: 'transports', label: t('trip.tabs.transports'), icon: Train },
@@ -109,8 +131,12 @@ export function useTripPlanner() {
     ...(enabledAddons.budget ? [{ id: 'finanzplan', label: t('trip.tabs.budget'), icon: Wallet }] : []),
     ...(enabledAddons.documents ? [{ id: 'dateien', label: t('trip.tabs.files'), icon: FolderOpen }] : []),
     ...(enabledAddons.collab ? [{ id: 'collab', label: t('admin.addons.catalog.collab.name'), icon: Users }] : []),
-    ...tripPagePlugins.map(p => ({ id: `plugin:${p.id}`, label: p.name, icon: Blocks })),
-  ]
+  ].filter(tab => tab.id === 'plan' || !replacedTabs.has(tab.id))
+  // Positioned plugin tabs splice in ascending order so two positions stay stable;
+  // the rest append, exactly as before this capability existed.
+  const positioned = tripPagePlugins.filter(p => p.tripPage?.position != null).sort((a, b) => (a.tripPage!.position! - b.tripPage!.position!))
+  for (const p of positioned) TRIP_TABS.splice(Math.min(p.tripPage!.position!, TRIP_TABS.length), 0, { id: `plugin:${p.id}`, label: p.name, icon: resolvePluginIcon(p.icon) })
+  for (const p of tripPagePlugins.filter(p => p.tripPage?.position == null)) TRIP_TABS.push({ id: `plugin:${p.id}`, label: p.name, icon: resolvePluginIcon(p.icon) })
 
   const [activeTab, setActiveTab] = useState<string>(() => {
     const saved = sessionStorage.getItem(`trip-tab-${tripId}`)
@@ -127,7 +153,11 @@ export function useTripPlanner() {
     }
   }, [enabledAddons, tripPluginIds, pluginsLoaded])
 
-  const handleTabChange = (tabId: string): void => {
+  const handleTabChange = (rawTabId: string): void => {
+    // A core tab a plugin replaced is gone from the bar, but a programmatic jump
+    // (e.g. onNavigateToFiles) could still target it and render a dead panel with
+    // no active pill — fall back to the plan view like the invalid-tab guard does.
+    const tabId = replacedTabs.has(rawTabId) ? 'plan' : rawTabId
     setActiveTab(tabId)
     sessionStorage.setItem(`trip-tab-${tripId}`, tabId)
     if (tabId === 'finanzplan') tripActions.loadBudgetItems?.(tripId)
@@ -225,20 +255,39 @@ export function useTripPlanner() {
   }, [])
 
   const connectionsStorageKey = tripId ? `trek:visible-connections:${tripId}` : null
-  const [visibleConnections, setVisibleConnections] = useState<number[]>(() => {
-    if (typeof window === 'undefined' || !connectionsStorageKey) return []
-    try {
-      const stored = window.localStorage.getItem(connectionsStorageKey)
-      return stored ? JSON.parse(stored) as number[] : []
-    } catch { return [] }
+  // Per-trip route-visibility preference — null means "never touched", which
+  // falls back to the account-wide map_always_show_routes default (see
+  // connectionsVisibility.ts). That fallback is purely computed, never
+  // written, so flipping the account setting later doesn't silently override
+  // a trip you've already made an explicit choice on.
+  const [storedConnections, setStoredConnections] = useState<StoredConnections | null>(() => {
+    if (typeof window === 'undefined' || !connectionsStorageKey) return null
+    return parseStoredConnections(window.localStorage.getItem(connectionsStorageKey))
   })
   useEffect(() => {
-    if (typeof window === 'undefined' || !connectionsStorageKey) return
-    window.localStorage.setItem(connectionsStorageKey, JSON.stringify(visibleConnections))
-  }, [connectionsStorageKey, visibleConnections])
+    if (typeof window === 'undefined' || !connectionsStorageKey || !storedConnections) return
+    window.localStorage.setItem(connectionsStorageKey, JSON.stringify(storedConnections))
+  }, [connectionsStorageKey, storedConnections])
+  const alwaysShowRoutesDefault = settings.map_always_show_routes === true
+  const routableReservationIds = useMemo(
+    () => reservations.filter(isRoutableReservation).map(r => r.id),
+    [reservations]
+  )
+  const effectiveConnections = useMemo(
+    () => resolveEffectiveConnections(storedConnections, alwaysShowRoutesDefault),
+    [storedConnections, alwaysShowRoutesDefault]
+  )
+  const visibleConnections = useMemo(
+    () => resolveVisibleConnectionIds(effectiveConnections, routableReservationIds),
+    [effectiveConnections, routableReservationIds]
+  )
+  const allConnectionsShown = effectiveConnections.mode === 'all-except'
   const toggleConnection = useCallback((id: number) => {
-    setVisibleConnections(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }, [])
+    setStoredConnections(prev => toggleConnectionId(prev, alwaysShowRoutesDefault, id))
+  }, [alwaysShowRoutesDefault])
+  const toggleAllConnections = useCallback(() => {
+    setStoredConnections(prev => flipAllConnectionsMode(prev, alwaysShowRoutesDefault))
+  }, [alwaysShowRoutesDefault])
   const [mapTransportDetail, setMapTransportDetail] = useState<Reservation | null>(null)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
@@ -248,6 +297,9 @@ export function useTripPlanner() {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+  // Layout is width-driven (isMobile); drag affordances are pointer-driven (isTouch).
+  // Conflating them is what left a tablet's places list undraggable-but-unscrollable (#1432).
+  const isTouch = useIsTouch()
 
   // Start photo fetches during splash screen so images are ready when map mounts
   useEffect(() => {
@@ -275,18 +327,25 @@ export function useTripPlanner() {
           .then(rows => setTripMembers(rows))
           .catch(() => {})
       } else {
-        tripsApi.getMembers(tripId).then(d => {
-          const all = [d.owner, ...(d.members || [])].filter(Boolean)
-          setTripMembers(all)
-        }).catch(() => {})
+        refreshMembers()
       }
     }
   }, [tripId])
 
+  // Accommodations live in this hook's local state, so store-level refreshes
+  // (remote trip date change, reconnect hydration) nudge us via this event (#1288).
+  useEffect(() => {
+    const onRefresh = () => loadAccommodations()
+    window.addEventListener('accommodations:refresh', onRefresh)
+    return () => window.removeEventListener('accommodations:refresh', onRefresh)
+  }, [loadAccommodations])
+
   useTripWebSocket(tripId)
 
-  const [mapCategoryFilter, setMapCategoryFilter] = useState<Set<string>>(new Set())
-  const [mapPlacesFilter, setMapPlacesFilter] = useState<string>('all')
+  // Same filter the places sidebar renders — shared via the store so tab
+  // switches can't desync the marker set from the filter UI (#1541).
+  const placesFilter = useTripStore((s) => s.placesFilter)
+  const placesCategoryFilter = useTripStore((s) => s.placesCategoryFilter)
 
   const [expandedDayIds, setExpandedDayIds] = useState<Set<number> | null>(null)
 
@@ -312,33 +371,32 @@ export function useTripPlanner() {
     }
 
     // Build set of planned place IDs for unplanned filter
-    const plannedIds = mapPlacesFilter === 'unplanned'
+    const plannedIds = placesFilter === 'unplanned'
       ? new Set(Object.values(assignments).flatMap(da => da.map(a => a.place?.id).filter(Boolean)))
       : null
 
     return places.filter(p => {
       if (!p.lat || !p.lng) return false
-      if (mapPlacesFilter === 'tracks' && !p.route_geometry) return false
-      if (mapCategoryFilter.size > 0) {
+      if (placesFilter === 'tracks' && !p.route_geometry) return false
+      if (placesCategoryFilter.size > 0) {
         if (p.category_id == null) {
-          if (!mapCategoryFilter.has('uncategorized')) return false
-        } else if (!mapCategoryFilter.has(String(p.category_id))) return false
+          if (!placesCategoryFilter.has('uncategorized')) return false
+        } else if (!placesCategoryFilter.has(String(p.category_id))) return false
       }
       if (hiddenPlaceIds.has(p.id)) return false
       if (plannedIds && plannedIds.has(p.id)) return false
       return true
     })
-  }, [places, mapCategoryFilter, mapPlacesFilter, assignments, expandedDayIds])
+  }, [places, placesCategoryFilter, placesFilter, assignments, expandedDayIds])
 
   const { route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay } = useRouteCalculation({ assignments } as any, selectedDayId, routeShown, routeProfile, tripAccommodations)
 
   const handleSelectDay = useCallback((dayId: number | null, skipFit?: boolean) => {
-    const changed = dayId !== selectedDayId
     tripActions.setSelectedDay(dayId)
-    if (changed && !skipFit) setFitKey(k => k + 1)
+    if (!skipFit) setFitKey(k => k + 1)
     setMobileSidebarOpen(null)
     updateRouteForDay(dayId)
-  }, [updateRouteForDay, selectedDayId])
+  }, [updateRouteForDay])
 
   const handlePlaceClick = useCallback((placeId: number | null, assignmentId?: number | null) => {
     if (assignmentId) {
@@ -652,6 +710,18 @@ export function useTripPlanner() {
         acc.place_id = (await resolveImportedPlace(acc.venue)) ?? undefined
         delete acc.venue
       }
+      // A hotel's address lives on the linked place. Write an edited address
+      // through to it, otherwise the typed value was silently dropped and the
+      // old one reappeared on the next open (#1496).
+      if (data.type === 'hotel' && acc && typeof acc.address === 'string') {
+        const address = acc.address.trim()
+        const linkedPlace = acc.place_id ? places.find(p => p.id === Number(acc.place_id)) : undefined
+        if (address && linkedPlace && (linkedPlace.address || '') !== address) {
+          try { await tripActions.updatePlace(tripId, linkedPlace.id, { address }) }
+          catch { /* keep saving the booking; the address still lands in location */ }
+        }
+        delete acc.address
+      }
       if (editingReservation) {
         // Don't force a day here. The old code pinned it to the (often empty)
         // selected day, which dropped the booking out of the Plan; preserving the
@@ -840,8 +910,6 @@ export function useTripPlanner() {
   }, [selectedDayId, assignments])
 
   const mapTileUrl = settings.map_tile_url || 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-  const defaultCenter = [settings.default_lat || 48.8566, settings.default_lng || 2.3522]
-  const defaultZoom = settings.default_zoom || 10
 
   const fontStyle = { fontFamily: "var(--font-system)" }
 
@@ -860,7 +928,7 @@ export function useTripPlanner() {
     selectedDayId, isLoading, tripActions, can, canUploadFiles,
     pushUndo, undo, canUndo, lastActionLabel, handleUndo,
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
-    allowedFileTypes, tripMembers, setTripMembers, loadAccommodations,
+    allowedFileTypes, tripMembers, setTripMembers, refreshMembers, loadAccommodations,
     TRANSPORT_TYPES, TRIP_TABS, activeTab, setActiveTab, handleTabChange,
     leftWidth, rightWidth, leftCollapsed, rightCollapsed, setLeftCollapsed, setRightCollapsed, startResizeLeft, startResizeRight,
     selectedPlaceId, selectedAssignmentId, setSelectedPlaceId, selectAssignment,
@@ -879,8 +947,8 @@ export function useTripPlanner() {
     routeShown, setRouteShown, routeProfile, setRouteProfile, fitKey, setFitKey,
     mobileSidebarOpen, setMobileSidebarOpen, mobilePlanScrollTopRef, mobilePlacesScrollTopRef,
     deletePlaceId, setDeletePlaceId, deletePlaceIds, setDeletePlaceIds,
-    visibleConnections, setVisibleConnections, toggleConnection, mapTransportDetail, setMapTransportDetail,
-    isMobile, mapCategoryFilter, setMapCategoryFilter, mapPlacesFilter, setMapPlacesFilter,
+    visibleConnections, toggleConnection, allConnectionsShown, toggleAllConnections, mapTransportDetail, setMapTransportDetail,
+    isMobile, isTouch,
     expandedDayIds, setExpandedDayIds, mapPlaces,
     route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay,
     handleSelectDay, handlePlaceClick, handleMarkerClick, handleMapClick, handleMapContextMenu, openAddPlaceFromPoi,
@@ -888,6 +956,6 @@ export function useTripPlanner() {
     handleAssignToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, handleUpdateDayTitle,
     handleSaveReservation, handleSaveTransport, handleDeleteReservation,
     selectedPlace, dayOrderMap, dayPlaces,
-    mapTileUrl, defaultCenter, defaultZoom, fontStyle, splashDone,
+    mapTileUrl, fontStyle, splashDone,
   }
 }

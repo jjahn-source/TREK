@@ -11,6 +11,8 @@ import {
   buildUser,
   buildTrip,
   buildDay,
+  buildPlace,
+  buildAssignment,
   buildReservation,
   buildTripFile,
 } from '../../../tests/helpers/factories';
@@ -373,6 +375,31 @@ describe('TransportModal', () => {
     expect(payload.endpoints.map((e: { role: string }) => e.role)).toEqual(['from', 'to']);
   });
 
+  it('FE-PLANNER-TRANSMODAL-029: re-saving a joined AirTrail flight keeps metadata.airtrail_ids (#1535)', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const res = buildReservation({ title: 'BRU → HEL → JFK', type: 'flight' }) as any;
+    res.metadata = {
+      airline: 'Finnair',
+      flight_number: 'AY1502',
+      airtrail_ids: ['101', '102'],
+      legs: [
+        { from: 'BRU', to: 'HEL', flight_number: 'AY1502', dep_time: '08:00', arr_time: '12:30' },
+        { from: 'HEL', to: 'JFK', flight_number: 'AY15', dep_time: '14:00', arr_time: '15:00' },
+      ],
+    };
+    res.endpoints = [
+      { role: 'from', sequence: 0, name: 'Brussels', code: 'BRU', lat: 50.9, lng: 4.48, timezone: 'Europe/Brussels', local_date: '2025-06-01', local_time: '08:00' },
+      { role: 'stop', sequence: 1, name: 'Helsinki-Vantaa', code: 'HEL', lat: 60.32, lng: 24.96, timezone: 'Europe/Helsinki', local_date: '2025-06-01', local_time: '14:00' },
+      { role: 'to', sequence: 2, name: 'JFK', code: 'JFK', lat: 40.64, lng: -73.78, timezone: 'America/New_York', local_date: '2025-06-01', local_time: '15:00' },
+    ];
+    render(<TransportModal {...defaultProps} reservation={res} onSave={onSave} />);
+    // A routine edit (retitle + save) must not cost the booking its AirTrail
+    // linkage — the import picker relies on it to not re-offer the legs.
+    await userEvent.click(screen.getByRole('button', { name: /^Update$/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0][0].metadata?.airtrail_ids).toEqual(['101', '102']);
+  });
+
   // ── Manual / Automated creation switch (#1065) ─────────────────────────────
 
   it('FE-PLANNER-TRANSMODAL-022: creating shows the Manual/Automated switch; Automated opens the transit search', async () => {
@@ -385,10 +412,36 @@ describe('TransportModal', () => {
     expect(screen.queryByPlaceholderText(/e\.g\. Lufthansa/i)).not.toBeInTheDocument();
   });
 
+  it('FE-PLANNER-TRANSMODAL-022b: a trip without start/end dates only offers the manual form', () => {
+    render(<TransportModal {...defaultProps} tripHasDates={false} places={[]} accommodations={[]} />);
+    expect(screen.queryByRole('button', { name: 'Automated transport' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manual transport' })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e\.g\. Lufthansa/i)).toBeInTheDocument();
+  });
+
   it('FE-PLANNER-TRANSMODAL-023: initialAutomated opens straight in the transit search with the day preset', () => {
     const days = [{ id: 10, trip_id: 1, day_number: 1, date: '2025-06-01', title: 'Day 1' }] as any;
     render(<TransportModal {...defaultProps} days={days} selectedDayId={10} initialAutomated places={[]} accommodations={[]} />);
     expect(screen.getAllByPlaceholderText('Search stop or station…')).toHaveLength(2);
+  });
+
+  it('FE-PLANNER-TRANSMODAL-028: automated quick picks only offer the chosen day\'s places (#1460)', async () => {
+    const days = [
+      buildDay({ id: 10, date: '2025-06-01' }),
+      buildDay({ id: 11, date: '2025-06-02' }),
+    ];
+    const louvre = buildPlace({ id: 1, name: 'Louvre' });
+    const eiffel = buildPlace({ id: 2, name: 'Eiffel Tower' });
+    const assignments = {
+      '10': [buildAssignment({ day_id: 10, place_id: louvre.id, place: louvre })],
+      '11': [buildAssignment({ day_id: 11, place_id: eiffel.id, place: eiffel })],
+    };
+    render(<TransportModal {...defaultProps} days={days} selectedDayId={10} initialAutomated places={[louvre, eiffel]} assignments={assignments} accommodations={[]} />);
+    // Focusing the "from" field opens the quick picks — day 1's place only.
+    const [fromInput] = screen.getAllByPlaceholderText('Search stop or station…');
+    await userEvent.click(fromInput);
+    expect(screen.getByText('Louvre')).toBeInTheDocument();
+    expect(screen.queryByText('Eiffel Tower')).not.toBeInTheDocument();
   });
 
   it('FE-PLANNER-TRANSMODAL-024: editing shows no Manual/Automated switch', () => {

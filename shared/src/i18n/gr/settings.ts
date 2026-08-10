@@ -7,6 +7,16 @@ const settings: TranslationStrings = {
   'settings.tabs.map': 'Χάρτης',
   'settings.tabs.notifications': 'Ειδοποιήσεις',
   'settings.tabs.integrations': 'Ενσωματώσεις',
+  'settings.plugins.oauth.connected': 'Συνδεδεμένο',
+  'settings.plugins.oauth.notConnected': 'Μη συνδεδεμένο',
+  'settings.plugins.oauth.connect': 'Σύνδεση',
+  'settings.plugins.oauth.disconnect': 'Αποσύνδεση',
+  'settings.tabs.plugins': 'Πρόσθετα',
+  'settings.plugins.title': 'Ρυθμίσεις προσθέτων',
+  'settings.plugins.subtitle':
+    'Οι προσωπικές σας ρυθμίσεις για τα πρόσθετα που χρησιμοποιείτε (κλειδιά API, προτιμήσεις).',
+  'settings.plugins.empty': 'Δεν υπάρχουν ενεργά πρόσθετα.',
+  'settings.plugins.saved': 'Οι ρυθμίσεις αποθηκεύτηκαν',
   'settings.tabs.account': 'Λογαριασμός',
   'settings.tabs.offline': 'Εκτός σύνδεσης',
   'settings.tabs.about': 'Σχετικά',
@@ -42,8 +52,6 @@ const settings: TranslationStrings = {
   'settings.mapTipLabel': 'Συμβουλή:',
   'settings.mapTip':
     'κάντε δεξί κλικ και σύρετε για περιστροφή/κλίση του χάρτη. Μεσαίο κλικ για προσθήκη τοποθεσίας (το δεξί κλικ έχει κρατηθεί για περιστροφή).',
-  'settings.latitude': 'Γεωγραφικό Πλάτος',
-  'settings.longitude': 'Γεωγραφικό Μήκος',
   'settings.saveMap': 'Αποθήκευση Χάρτη',
   'settings.apiKeys': 'Κλειδιά API',
   'settings.mapsKey': 'Google Maps API Key',
@@ -86,6 +94,16 @@ const settings: TranslationStrings = {
   'settings.notificationPreferences.email': 'Email',
   'settings.notificationPreferences.webhook': 'Webhook',
   'settings.notificationPreferences.inapp': 'Εντός εφαρμογής',
+  'settings.notificationPreferences.notConfigured':
+    'Δεν έχει ρυθμιστεί ακόμη — ρυθμίστε το στις ρυθμίσεις του πρόσθετου',
+  'settings.plugins.actions': 'Ενέργειες',
+  'settings.plugins.actions.confirm': 'Εκτέλεση αυτής της ενέργειας;',
+  'settings.notificationPreferences.sendTest': 'Αποστολή δοκιμής',
+  'settings.notificationPreferences.configure': 'Ρύθμιση',
+  'settings.notificationPreferences.testSuccess': 'Στάλθηκε δοκιμαστική ειδοποίηση.',
+  'settings.notificationPreferences.testFailed': 'Η δοκιμή απέτυχε.',
+  'settings.notificationPreferences.pluginConfigured':
+    'Ρυθμίστηκε. Διαχειριστείτε τα διαπιστευτήρια στη σελίδα ρυθμίσεων του πρόσθετου.',
   'settings.notificationPreferences.ntfy': 'Ntfy',
   'settings.notificationPreferences.noChannels':
     'Δεν έχουν διαμορφωθεί κανάλια ειδοποιήσεων. Ζητήστε από έναν διαχειριστή να ρυθμίσει ειδοποιήσεις email ή webhook.',
@@ -292,6 +310,7 @@ const settings: TranslationStrings = {
   'settings.mfa.demoBlocked': 'Δεν είναι διαθέσιμο σε λειτουργία demo',
   'settings.currency': 'Currency',
   'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currencyTrip': 'Νόμισμα ταξιδιού',
   'settings.passkey.title': 'Passkeys',
   'settings.passkey.description':
     'Συνδεθείτε πιο γρήγορα και με προστασία από phishing χρησιμοποιώντας ένα passkey — το δαχτυλικό σας αποτύπωμα, το πρόσωπό σας, ένα PIN ή ένα κλειδί υλικού. Ο κωδικός σας παραμένει ως εφεδρεία.',
@@ -475,6 +494,18 @@ const settings: TranslationStrings = {
   'settings.offline.banner.syncing': 'Συγχρονισμός {count}…',
   'settings.offline.banner.failed': 'Αποτυχία συγχρονισμού: {count}',
   'settings.offline.banner.conflicts': 'Διενέξεις: {count}',
+  'settings.pluginActivity.title': 'Δραστηριότητα προσθέτων',
+  'settings.pluginActivity.description':
+    'Κάθε ενέργεια που εκτέλεσε ένα πρόσθετο εκ μέρους σας, με τις πιο πρόσφατες πρώτες.',
+  'settings.pluginActivity.empty': 'Δεν υπάρχει ακόμη δραστηριότητα προσθέτων.',
+  'settings.pluginActivity.refresh': 'Ανανέωση',
+  'settings.pluginActivity.columns.plugin': 'Πρόσθετο',
+  'settings.pluginActivity.columns.action': 'Ενέργεια',
+  'settings.pluginActivity.columns.resource': 'Πόρος',
+  'settings.pluginActivity.columns.when': 'Πότε',
+  'settings.pluginActivity.columns.status': 'Αποτέλεσμα',
+  'settings.alwaysShowRoutes': 'Πάντα εμφάνιση διαδρομών κράτησης',
+  'settings.alwaysShowRoutesHint': 'Εμφανίζει αυτόματα στον χάρτη τη διαδρομή κάθε πτήσης, τρένου και άλλης κράτησης, χωρίς να χρειάζεται να την ενεργοποιείτε μία προς μία.',
 };
 
 export default settings;

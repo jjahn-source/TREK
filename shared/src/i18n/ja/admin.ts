@@ -199,6 +199,13 @@ const admin: TranslationStrings = {
   'admin.plugins.dropToUpload': 'プラグインの .zip をドロップしてインストール',
   'admin.plugins.uploaded': 'プラグイン「{name}」をアップロードしました — 実行するには有効化してください',
   'admin.plugins.sideloaded': '手動読み込み',
+  'admin.plugins.devLinkBadge': 'Dev-Link',
+  'admin.plugins.devLinkHint':
+    'ローカルのビルドディレクトリから読み込まれ、実データでホットリロードされます（開発専用）',
+  'admin.plugins.devLinkTitle': 'ローカルプラグインをリンク',
+  'admin.plugins.devLinkPathPlaceholder': '/absolute/path/to/your/plugin',
+  'admin.plugins.devLinkButton': 'リンク',
+  'admin.plugins.devLinkLinked': '{id} をリンクしました — 実行するには有効化してください',
   'admin.plugins.sideloadedHint': '手動でアップロード — レジストリ経由ではなく、署名・審査なし',
   'admin.plugins.browse': 'プラグインを探す',
   'admin.plugins.installed': 'インストール済み',
@@ -211,6 +218,18 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'プラグインを無効化しました',
   'admin.plugins.viewErrors': 'エラーログを表示',
   'admin.plugins.errorLog': 'エラーログ',
+  'admin.plugins.allowedHosts': '許可するホスト',
+  'admin.plugins.allowedHosts.hint':
+    'このプラグインは、あなたしか指定できないサービス（セルフホストのサーバー）と通信します。到達を許可するホストを追加してください。それ以外には到達できません。',
+  'admin.plugins.allowedHosts.none': 'ホストはまだ追加されていません。',
+  'admin.plugins.allowedHosts.unsupported':
+    'このプラグインは運用者指定のホストを使いません。許可ホストはマニフェストで固定されています。',
+  'admin.plugins.allowedHosts.restartNote': '保存するとプラグインが再起動し、新しい一覧が反映されます。',
+  'admin.plugins.allowedHosts.add': '許可ホストを追加',
+  'admin.plugins.allowedHosts.count': '許可ホスト {n} 件',
+  'admin.plugins.operatorEgressPill': '+ 追加するホスト',
+  'admin.plugins.operatorEgressHint':
+    'このプラグインは、あなたしか指定できないサービス（セルフホストのサーバー）と通信します。インストール後、⋯ → 許可するホスト から追加してください。それ以外には到達できません。',
   'admin.plugins.noErrors': '記録されたエラーはありません。',
   'admin.plugins.uninstalled': 'プラグインをアンインストールしました',
   'admin.plugins.uninstallTitle': 'プラグインをアンインストールしますか？',
@@ -252,6 +271,7 @@ const admin: TranslationStrings = {
   'admin.plugins.scope.user': 'ユーザーごと',
   'admin.plugins.fieldRequired': '必須',
   'admin.plugins.sourceRepo': 'ソースリポジトリ',
+  'admin.plugins.reportIssue': '問題を報告',
   'admin.plugins.homepage': 'ホームページ',
   'admin.plugins.requiresTrek': 'TREK {version} 以上が必要',
   'admin.plugins.reviewedOn': 'レビュー日：{date}',
@@ -260,7 +280,45 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.db:read:users': '基本プロフィール情報の読み取り（名前・アバターのみ — 認証情報は含まれません）',
   'admin.plugins.perm.db:read:costs': '操作中のユーザーがアクセスできる支出（予算項目）の読み取り',
   'admin.plugins.perm.db:read:packing': '操作中のユーザーがアクセスできる旅行の持ち物リストの読み取り',
+  'admin.plugins.perm.db:write:packing': '操作中のユーザーが編集できる旅行の持ち物リスト項目の作成・編集・削除',
+  'admin.plugins.perm.weather:read': 'ホストのキャッシュされた天気予報を読み取る（座標で）',
+  'admin.plugins.perm.db:read:categories': 'グローバルな場所カテゴリ一覧を読み取る',
+  'admin.plugins.perm.db:read:tags': '操作中のユーザーのタグを読み取る',
+  'admin.plugins.perm.db:write:tags': '操作中のユーザーのタグの作成・編集・削除',
+  'admin.plugins.perm.db:read:todos': '操作中のユーザーがアクセスできる旅行のToDoを読み取る',
+  'admin.plugins.perm.db:write:todos': '操作中のユーザーが編集できる旅行のToDoの作成・編集・削除',
+  'admin.plugins.perm.db:write:atlas':
+    '操作中のユーザーの訪問済みの国と地域をマークし、バケットリストを管理（Atlas アドオンが必要）',
+  'admin.plugins.perm.db:write:vacay':
+    '操作中のユーザーのアクティブなプランで休暇日と会社休日を切り替え（Vacay アドオンが必要）',
+  'admin.plugins.perm.db:write:journal':
+    '操作中のユーザーが編集できる日記のエントリの作成・編集・削除（Journey アドオンが必要）',
+  'admin.plugins.perm.db:write:collections':
+    'コレクションの作成・編集と場所の保存（操作中のユーザーのコレクションロールで実行、Collections アドオンが必要）',
+  'admin.plugins.perm.db:write:files':
+    '操作中のユーザーが編集できる旅行にファイルを添付（10MB上限、ブロック対象の拡張子は拒否）し、そのリンクを管理',
+  'admin.plugins.perm.db:write:collab':
+    '操作中のユーザーが編集できる旅行にメモ・アンケート・チャットメッセージを投稿（Collab アドオンが必要）',
+  'admin.plugins.perm.db:write:members':
+    '旅行にユーザーを追加 — 旅行へのアクセスを付与。操作中のユーザーのメンバー管理権限で保護',
+  'admin.plugins.perm.notify:send':
+    '操作中のユーザー、またはそのユーザーが所属する旅行に通知（ベル受信箱＋メール/ntfy）を送信 — 任意の受信者には送らない',
+  'admin.plugins.perm.ai:invoke':
+    '管理者が構成した AI プロバイダー（テキスト補完＋ドキュメント抽出）を操作中のユーザーの代わりに実行 — プラグインはキーを保持しない',
+  'admin.plugins.perm.oauth:client':
+    'ホスト仲介の OAuth であなたに代わってサードパーティサービスに接続（トークンはホストが保持し、プラグインは決して見ない）',
   'admin.plugins.perm.db:read:files': '操作中のユーザーがアクセスできる旅行のファイルの読み取り',
+  'admin.plugins.perm.db:write:reservations': '操作中のユーザーが編集できる旅行の予約の作成・編集・削除',
+  'admin.plugins.perm.db:write:accommodations': '操作中のユーザーが編集できる旅行の宿泊の作成・編集・削除',
+  'admin.plugins.perm.db:read:journal': '操作中のユーザーの旅行日記の読み取り（Journey アドオンが必要）',
+  'admin.plugins.perm.db:read:atlas': '操作中のユーザーが訪問した国と地域の読み取り（Atlas アドオンが必要）',
+  'admin.plugins.perm.db:read:vacay': '操作中のユーザーの休暇プランの読み取り（Vacay アドオンが必要）',
+  'admin.plugins.perm.db:read:daynotes': '操作中のユーザーがアクセスできる旅行の日別メモの読み取り',
+  'admin.plugins.perm.db:read:collections':
+    '操作中のユーザーの保存した場所のコレクションの読み取り（Collections アドオンが必要）',
+  'admin.plugins.perm.db:write:daynotes': '操作中のユーザーが編集できる旅行の日別メモの作成・編集・削除',
+  'admin.plugins.perm.jobs:run':
+    '宣言されたバックグラウンドジョブをスケジュールに従って実行（ユーザーコンテキストなし — ユーザーデータは読み取れません）',
   'admin.plugins.perm.db:write:costs': '操作中のユーザーが編集できる旅行への支出（予算項目）の作成',
   'admin.plugins.perm.db:write:places': '操作中のユーザーが編集できる旅行の場所の追加・編集・削除',
   'admin.plugins.perm.db:write:days': '操作中のユーザーが編集できる旅行の日程の追加・編集・削除',
@@ -274,9 +332,23 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.hook:calendar-source': 'カレンダーへの予定の提供',
   'admin.plugins.perm.hook:place-detail-provider': '場所に追加の詳細情報（レビュー、評価、リンク）を提供',
   'admin.plugins.perm.hook:trip-warning-provider': '旅程に検証警告を表示（プランナー内に表示）',
+  'admin.plugins.perm.hook:table-contributor': '旅行のビュー（予約、場所、日程）に列とアクションを追加',
+  'admin.plugins.perm.hook:map-marker-provider': '旅行の地図にマーカーを追加（例: 予約や POI を表示）',
+  'admin.plugins.perm.hook:pdf-section-provider': '旅行の PDF エクスポートにテキストセクションを追加',
+  'admin.plugins.perm.hook:atlas-layer-provider': 'Atlas の世界地図で国をハイライト（例: ウィッシュリストや渡航情報）',
+  'admin.plugins.perm.hook:journal-entry-provider': '日記のエントリーに追加の行（リンク、統計）を提供',
+  'admin.plugins.perm.hook:user-data':
+    'ユーザーについて保存したデータの消去またはエクスポート（GDPR：アカウント削除・データ開示請求）',
+  'admin.plugins.perm.hook:trip-card-provider': 'ダッシュボードの旅行カードに小さなバッジ（状態・カウント）を追加',
+  'admin.plugins.perm.hook:notification-channel': '追加のチャンネルで通知を配信する',
   'admin.plugins.perm.events:subscribe':
     'コアのアクティビティイベントに反応（イベント名と旅程のみで、内容には一切アクセスしません）',
   'admin.plugins.perm.http:outbound': '宣言済みホストへの外部リクエストの送信',
+  'admin.plugins.perm.db:read:collab':
+    '操作中のユーザーがアクセスできる旅行のメモ・アンケート・チャットメッセージの読み取り（Collab アドオンが必要）',
+  'admin.plugins.perm.db:read:files:content': '操作中のユーザーがアクセスできる旅行のファイル内容（バイト）の読み取り',
+  'admin.plugins.perm.db:create:trips': '操作中のユーザーが所有する新しい旅行の作成',
+  'admin.plugins.perm.rates:read': 'ホストのキャッシュされた為替レートを読み取る',
   'admin.plugins.updateConsentTitle': 'このアップデートには新しい権限が必要です',
   'admin.plugins.updateConsentBody':
     '{name} v{version} は、まだ許可していない権限を要求しています。新しいバージョンはインストール済みですが、承認するまで無効のままです。',
@@ -303,6 +375,34 @@ const admin: TranslationStrings = {
   'admin.plugins.security.reviewedTitle': '「レビュー済み」の意味',
   'admin.plugins.security.reviewedBody':
     'レビュー済みのプラグインは、TREKのメンテナーが各バージョンで手動でマルウェアの有無を確認したものです — 悪意のあるコードの有無を確認したものであり、正しく動作するかどうかを確認したものではありません。プラグインが無害であることを約束するものではありません。',
+  'admin.plugins.security.signedTitle': '「署名済み」の意味',
+  'admin.plugins.security.signedBody':
+    'TREKがインストールのたびに検証するチェックサムは、ファイルがレジストリの保証するものとまったく同一であることを証明します。署名が証明するのは別のことです。そのファイルが作者本人から届いたこと、そして作者だけが持つ鍵で署名されていることです。署名済みのプラグインはその両方を備えています。署名がないプラグインが危険というわけではありません — 保証がひとつ少ないだけであり、現時点ではレジストリのプラグインの多くは署名されていません。',
+  'admin.plugins.signed': '署名済み',
+  'admin.plugins.signedHint': 'インストール時に作者の署名鍵で検証済み',
+  'admin.plugins.unsigned': '署名なし',
+  'admin.plugins.unsignedHint':
+    'ファイルはレジストリが保証するものと一致しますが、作者と結びつけるものはありません。保証がひとつ少ないだけで、危険というわけではありません。',
+  'admin.plugins.updateBlocked': 'アップデートをブロックしました — {reason}',
+  'admin.plugins.reviewBlock': '確認する',
+  'admin.plugins.retrusted': '新しい署名鍵を信頼しました — プラグインを更新しました',
+  'admin.plugins.sig.title': '{name}の署名を検証できませんでした',
+  'admin.plugins.sig.keyChangedBody':
+    '作者の署名鍵が、このプラグインをインストールしたときの鍵と異なります。作者が鍵を更新することは実際にあります — ただし、プラグインを乗っ取った攻撃者も、ここからはまったく同じように見えます。',
+  'admin.plugins.sig.invalidBody':
+    'ファイルが作者の署名と一致しません。作者が署名したものではなく、破損したか、改ざんされたかのどちらかです。これを上書きすることはできません。',
+  'admin.plugins.sig.missingBody':
+    'このプラグインはインストール時には署名されていましたが、新しいバージョンには署名がありません。TREKはこの後退を黙って受け入れることはしません。これを上書きすることはできません。',
+  'admin.plugins.sig.incompleteBody':
+    'レジストリの登録内容が中途半端です。作者の鍵は宣言されているのに、このバージョンには署名がありません（またはその逆です）。これはプラグイン側の不備です。これを上書きすることはできません。',
+  'admin.plugins.sig.pinnedKey': 'インストール時の鍵',
+  'admin.plugins.sig.newKey': '現在提示されている鍵',
+  'admin.plugins.sig.confirmOutOfBand':
+    'TREKには、正当な鍵の更新と乗っ取りを見分けることはできません — ここからは両者はまったく同じに見えます。受け入れる前に、すでに信頼している経路で作者に新しい鍵を確認してください。受け入れると、プラグインが更新され、新しい鍵が記憶されます。',
+  'admin.plugins.sig.retrustConfirm': '新しい鍵を信頼して更新',
+  'admin.plugins.sig.cancel': '信頼しない',
+  'admin.plugins.sig.consentUnsigned':
+    'このバージョンと作者を結びつけるものはありません — ファイルはレジストリと一致しますが、作者の署名は付いていません。',
   'admin.plugins.security.trustTitle': '結論',
   'admin.plugins.security.trustBody':
     'プラグインのインストールは、サードパーティ製アプリのインストールと同じです。信頼できる作者のコードのみを追加し、少しでも疑わしい場合は、まずご自身で内容を確認してください。TREKはサードパーティ製プラグインについて一切の責任を負いません。',
@@ -319,6 +419,7 @@ const admin: TranslationStrings = {
   'admin.plugins.sortName': '名前',
   'admin.plugins.sortRecent': '最近更新',
   'admin.plugins.sortUpdates': 'アップデート優先',
+  'admin.plugins.sortDownloads': 'ダウンロード数順',
   'admin.plugins.updatesAvailable': 'プラグインに{count}件のアップデートがあります。',
   'admin.plugins.updateAll': 'すべて更新',
   'admin.plugins.noMatchInstalled': '検索条件に一致するインストール済みプラグインはありません。',
@@ -339,7 +440,11 @@ const admin: TranslationStrings = {
   'admin.plugins.cap.widget': 'ダッシュボードウィジェット',
   'admin.plugins.cap.heroWidget': '搭乗券ウィジェット',
   'admin.plugins.cap.placeSlot': '場所詳細',
+  'admin.plugins.cap.daySlot': '日程詳細',
+  'admin.plugins.cap.reservationSlot': '予約詳細',
+  'admin.plugins.cap.replacesTabs': 'プランナーのタブを置き換え',
   'admin.plugins.cap.realtime': 'リアルタイム更新',
+  'admin.plugins.cap.notificationChannel': '通知チャンネル',
   'admin.plugins.cap.photos': '写真を提供',
   'admin.plugins.cap.calendar': 'カレンダー予定を提供',
   'admin.plugins.cap.placeDetails': '場所を充実',
@@ -357,6 +462,10 @@ const admin: TranslationStrings = {
   'admin.plugins.dep.download': 'ダウンロード',
   'admin.plugins.dep.update': '更新',
   'admin.plugins.dep.resolveHint': '独自の依存関係を含め、最新の互換バージョンをダウンロードします。',
+  'admin.plugins.dep.trekIncompatible': 'TREK {range} が必要です — このサーバーは {host} です',
+  'admin.plugins.dep.trekUnknown': '対応する TREK バージョンが宣言されていません',
+  'admin.plugins.installCompatible': '{version} をインストール',
+  'admin.plugins.incompatible': '非対応',
   'admin.plugins.accessTitle': 'アクセスできるもの',
   'admin.plugins.connectsTitle': '接続先',
   'admin.plugins.detailsTitle': '詳細',
@@ -365,11 +474,12 @@ const admin: TranslationStrings = {
   'admin.plugins.metaSize': 'サイズ',
   'admin.plugins.metaRequires': '要件',
   'admin.plugins.metaReviewed': 'レビュー日',
+  'admin.plugins.downloads': 'ダウンロード数',
   'admin.addons.title': 'アドオン',
   'admin.addons.subtitle': '機能を有効／無効にしてTREKをカスタマイズします。',
   'admin.addons.catalog.packing.name': 'リスト',
   'admin.addons.catalog.packing.description': '旅行用の持ち物リストとToDo',
-  'admin.addons.catalog.budget.name': '予算',
+  'admin.addons.catalog.budget.name': '費用',
   'admin.addons.catalog.budget.description': '支出の管理と予算計画',
   'admin.addons.catalog.documents.name': 'ドキュメント',
   'admin.addons.catalog.documents.description': '旅行書類の保存・管理',

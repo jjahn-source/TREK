@@ -2,10 +2,11 @@
 import { createElement } from 'react'
 import { getCategoryIcon } from '../shared/categoryIcons'
 import { FileText, Info, Clock, MapPin, Navigation, Train, Plane, Bus, Car, Ship, Sailboat, Bike, CarTaxiFront, Route, Coffee, Ticket, Star, Heart, Camera, Flag, Lightbulb, AlertTriangle, ShoppingBag, Bookmark, Hotel, LogIn, LogOut, KeyRound, BedDouble, Utensils, Users, LucideIcon } from 'lucide-react'
-import { accommodationsApi, mapsApi } from '../../api/client'
+import { accommodationsApi, mapsApi, pluginsApi } from '../../api/client'
 import type { Trip, Day, Place, Category, AssignmentsMap, DayNote } from '../../types'
 import { isDayInAccommodationRange, getDayOrder } from '../../utils/dayOrder'
-import { splitReservationDateTime } from '../../utils/formatters'
+import { formatMoney, formatMoneySum, splitReservationDateTime, type MoneyEntry } from '../../utils/formatters'
+import { fetchExchangeRates } from '../../hooks/useExchangeRates'
 import { getFlightLegs, getTrainLegs } from '../../utils/flightLegs'
 
 function renderLucideIcon(icon:LucideIcon, props = {}) {
@@ -40,7 +41,7 @@ const svgPin   = `<svg width="11" height="11" viewBox="0 0 24 24" fill="#94a3b8"
 const svgClock = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`
 const svgClock2= `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`
 const svgCheck = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>`
-const svgEuro  = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round"><path d="M14 5c-3.87 0-7 3.13-7 7s3.13 7 7 7c2.17 0 4.1-.99 5.4-2.55"/><path d="M5 11h8M5 13h8"/></svg>`
+const svgMoney = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12h6" stroke-linecap="round"/></svg>`
 
 function escHtml(str) {
   if (!str) return ''
@@ -92,9 +93,15 @@ function longDateRange(days, locale) {
   return `${f.toLocaleDateString(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' })} – ${l.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}`
 }
 
-function dayCost(assignments, dayId, locale) {
-  const total = (assignments[String(dayId)] || []).reduce((s, a) => s + (parseFloat(a.place?.price) || 0), 0)
-  return total > 0 ? `${total.toLocaleString(locale)} EUR` : null
+// Day totals render in the trip's currency; foreign-currency place prices are
+// converted via the pre-fetched rates, or listed per-currency when rates are
+// unavailable (#1561).
+function dayCost(assignments, dayId, locale, tripCurrency, rates) {
+  const entries: MoneyEntry[] = (assignments[String(dayId)] || []).map(a => ({
+    amount: parseFloat(a.place?.price) || 0,
+    currency: a.place?.currency || tripCurrency,
+  }))
+  return formatMoneySum(entries, tripCurrency, locale || 'en', rates)
 }
 
 // Pre-fetch place photos for all assigned places.
@@ -149,14 +156,29 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   //retrieve accommodations for the trip to display on the day sections and prefetch their photos if needed
   const accommodations = await accommodationsApi.list(trip.id);
 
+  // Sections contributed by pdfSectionProvider plugins — server-normalized plain
+  // text (counts + lengths capped), appended after the days. Fail-safe: an error
+  // just means no extra sections, the core export is untouched.
+  const pluginSections = await pluginsApi.pdfSections(trip.id).then(r => r.sections || []).catch(() => [])
+
   // Pre-fetch place photos (Google, OSM and coords-only places)
   const photoMap = await fetchPlacePhotos(assignments, places)
 
   const totalAssigned = new Set(
     Object.values(assignments || {}).flatMap(a => a.map(x => x.place?.id)).filter(Boolean)
   ).size
-  const totalCost = Object.values(assignments || {})
-    .flatMap(a => a).reduce((s, a) => s + (Number(a.place?.price) || 0), 0)
+  // The PDF is a trip-scoped, shareable document, so totals stay in the trip's
+  // own currency. Rates are resolved ONCE before any HTML is built so the cover
+  // stat and every day header agree; all-same-currency trips skip the FX fetch
+  // entirely (offline export keeps working), and a failed fetch degrades to
+  // per-currency breakdowns instead of mislabeled sums (#1561).
+  const tripCur = (trip?.currency || 'EUR').toUpperCase()
+  const allCostEntries: MoneyEntry[] = Object.values(assignments || {})
+    .flatMap(a => a)
+    .map(a => ({ amount: Number(a.place?.price) || 0, currency: a.place?.currency || tripCur }))
+  const needsFx = allCostEntries.some(e => e.amount > 0 && e.currency.toUpperCase() !== tripCur)
+  const fxRates = needsFx ? await fetchExchangeRates(tripCur) : null
+  const totalCostLabel = formatMoneySum(allCostEntries, tripCur, loc || 'en', fxRates)
 
   // Span helpers for multi-day transport (mirrors DayPlanSidebar logic)
   const pdfGetDayOrder = (d: Day) => d.day_number
@@ -199,7 +221,7 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   const daysHtml = sorted.map((day, di) => {
     const assigned = assignments[String(day.id)] || []
     const notes = (dayNotes || []).filter(n => n.day_id === day.id)
-    const cost = dayCost(assignments, day.id, loc)
+    const cost = dayCost(assignments, day.id, loc, tripCur, fxRates)
 
     // Reservations for this day (hotel rendered via accommodations block; car middle-phase rendered in sidebar header only)
     const dayReservations = pdfGetTransportForDay(day.id)
@@ -315,7 +337,7 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
 
           const chips = [
             place.place_time ? `<span class="chip">${svgClock}${escHtml(place.place_time)}</span>` : '',
-            place.price && parseFloat(place.price) > 0 ? `<span class="chip chip-green">${svgEuro}${Number(place.price).toLocaleString(loc)} EUR</span>` : '',
+            place.price && parseFloat(place.price) > 0 ? `<span class="chip chip-green">${svgMoney}${formatMoney(Number(place.price), place.currency || trip.currency, loc)}</span>` : '',
           ].filter(Boolean).join('')
 
           return `
@@ -375,17 +397,40 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
         </div>`
       : ''
 
+    // A real <table> so the browser repeats the <thead> day header at the top of
+    // every page an overflowing day spills onto (#1471). CSS `table-header-group`
+    // on a <div> is NOT repeated by Chromium's print engine — only real thead is.
     return `
-      <div class="day-section${di > 0 ? ' page-break' : ''}">
-        <div class="day-header">
-          <span class="day-tag">${escHtml(tr('dayplan.dayN', { n: day.day_number })).toUpperCase()}</span>
-          <span class="day-title">${escHtml(day.title || tr('dayplan.dayN', { n: day.day_number }))}</span>
-          ${day.date ? `<span class="day-date">${shortDate(day.date, loc)}</span>` : ''}
-          ${cost ? `<span class="day-cost">${cost}</span>` : ''}
-        </div>
-        <div class="day-body">${accommodationsHtml}${itemsHtml}</div>
-      </div>`  
+      <table class="day-section${di > 0 ? ' page-break' : ''}">
+        <thead class="day-header"><tr><td>
+          <div class="day-header-bar">
+            <span class="day-tag">${escHtml(tr('dayplan.dayN', { n: day.day_number })).toUpperCase()}</span>
+            <span class="day-title">${escHtml(day.title || tr('dayplan.dayN', { n: day.day_number }))}</span>
+            ${day.date ? `<span class="day-date">${shortDate(day.date, loc)}</span>` : ''}
+            ${cost ? `<span class="day-cost">${cost}</span>` : ''}
+          </div>
+        </td></tr></thead>
+        <tbody class="day-body-group"><tr><td>
+          <div class="day-body">${accommodationsHtml}${itemsHtml}</div>
+        </td></tr></tbody>
+      </table>`
   }).join('')
+
+  // Plugin sections after the days — every value is host-vetted plain text and
+  // still escHtml'd here (same treatment as the core content above).
+  const pluginSectionsHtml = pluginSections.length === 0 ? '' : `
+    <div class="plugin-sections page-break">
+      ${pluginSections.map(s => `
+      <div class="plugin-section">
+        <div class="plugin-section-title">${escHtml(s.title)}</div>
+        ${(s.paragraphs || []).map(p => `<p class="plugin-section-text">${escHtml(p)}</p>`).join('')}
+        ${s.table ? `
+        <table class="plugin-section-table">
+          <thead><tr>${s.table.headers.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr></thead>
+          <tbody>${s.table.rows.map(row => `<tr>${row.map(cell => `<td>${escHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>` : ''}
+      </div>`).join('')}
+    </div>`
 
   const html = `<!DOCTYPE html>
 <html lang="${loc.split('-')[0]}">
@@ -456,8 +501,10 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   .cover-stat-lbl { font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.4); letter-spacing: 1px; margin-top: 4px; text-transform: uppercase; }
 
   /* ── Day ───────────────────────────────────────── */
+  /* .day-section is a real <table>; its <thead> day header repeats on overflow pages. */
   .page-break { page-break-before: always; }
-  .day-header {
+  .day-section { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .day-header-bar {
     background: #0f172a; padding: 11px 28px;
     display: flex; align-items: center; gap: 8px;
   }
@@ -465,7 +512,11 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   .day-title { font-size: 13px; font-weight: 600; color: #fff; flex: 1; }
   .day-date  { font-size: 9px; color: rgba(255,255,255,0.45); }
   .day-cost  { font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.65); }
-  .day-body  { padding: 12px 28px 6px; }
+  /* The gap under the header bar must sit inside the repeated <thead> cell: a block-start
+     padding on .day-body is only painted on the box's first fragment, so overflow pages
+     would render their first card flush against the bar (#1531). */
+  .day-header > tr > td { padding-bottom: 12px; }
+  .day-body  { padding: 0 28px 6px; }
 
   /* accommodation info */
   .day-accommodations-overview { font-size: 12px; }
@@ -538,6 +589,15 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
 
   .empty-day { font-size: 9.5px; color: #cbd5e1; font-style: italic; text-align: center; padding: 14px 0; }
 
+  /* ── Plugin sections ───────────────────────────── */
+  .plugin-sections { padding: 16px 28px 6px; }
+  .plugin-section { margin-bottom: 16px; page-break-inside: avoid; }
+  .plugin-section-title { font-size: 12px; font-weight: 600; color: #1e293b; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+  .plugin-section-text { font-size: 9.5px; color: #334155; line-height: 1.55; margin-bottom: 5px; }
+  .plugin-section-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .plugin-section-table th { font-size: 8px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; }
+  .plugin-section-table td { font-size: 9px; color: #334155; padding: 4px 8px; border-bottom: 1px solid #f1f5f9; }
+
   /* ── Print ─────────────────────────────────────── */
   @media print {
     body { margin: 0; }
@@ -581,8 +641,8 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
         <div class="cover-stat-num">${totalAssigned}</div>
         <div class="cover-stat-lbl">${escHtml(tr('pdf.planned'))}</div>
       </div>
-      ${totalCost > 0 ? `<div>
-        <div class="cover-stat-num">${totalCost.toLocaleString(loc)}</div>
+      ${totalCostLabel ? `<div>
+        <div class="cover-stat-num">${totalCostLabel}</div>
         <div class="cover-stat-lbl">${escHtml(tr('pdf.costLabel'))}</div>
       </div>` : ''}
     </div>
@@ -591,7 +651,7 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
 
 <!-- Days -->
 ${daysHtml}
-
+${pluginSectionsHtml}
 </body></html>`
 
   // Open in modal with srcdoc iframe (no URL loading = no X-Frame-Options issue)

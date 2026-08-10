@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { downloadTripPDF } from './TripPDF'
 import { server } from '../../../tests/helpers/msw/server'
+import { clearExchangeRateCache } from '../../hooks/useExchangeRates'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,14 @@ beforeEach(() => {
     http.get('/api/maps/place-photo/:placeId', () =>
       HttpResponse.json({ photoUrl: null })
     ),
+    http.get('/api/pdf-sections/:tripId', () =>
+      HttpResponse.json({ sections: [] })
+    ),
+    // Mixed-currency exports fetch FX rates; keep the suite hermetic.
+    http.get('https://api.frankfurter.dev/v2/rates', () => HttpResponse.json([])),
   )
+  // The FX cache is module-level and would leak rates between tests in this file.
+  clearExchangeRateCache()
 })
 
 afterEach(() => {
@@ -149,6 +157,34 @@ describe('downloadTripPDF', () => {
     await downloadTripPDF(args)
     const iframe = getIframe()
     expect(iframe!.srcdoc).toContain('Day One')
+  })
+
+  it('FE-COMP-TRIPPDF-005b: day is a table with a thead header that repeats on overflow pages (#1471)', async () => {
+    await downloadTripPDF(richArgs)
+    const iframe = getIframe()
+    const srcdoc = iframe!.srcdoc
+    // The day is a real <table> whose <thead> is repeated by the browser's print
+    // engine on every page an overflowing day spills onto.
+    expect(srcdoc).toContain('<table class="day-section')
+    expect(srcdoc).toContain('<thead class="day-header">')
+    expect(srcdoc).toContain('<tbody class="day-body-group">')
+    // The dark bar (background/padding/flex) lives in an inner wrapper inside the thead.
+    expect(srcdoc).toContain('class="day-header-bar"')
+    // Day content still renders inside the new structure.
+    expect(srcdoc).toContain('Rome Day')
+    expect(srcdoc).toContain('Colosseum')
+  })
+
+  it('FE-COMP-TRIPPDF-005c: the gap under the day header lives in the repeated thead cell (#1531)', async () => {
+    await downloadTripPDF(richArgs)
+    const iframe = getIframe()
+    const srcdoc = iframe!.srcdoc
+    // The thead is repeated on every overflow page, so the spacing below the header bar
+    // must be declared on its cell...
+    expect(srcdoc).toContain('.day-header > tr > td { padding-bottom: 12px; }')
+    // ...and not as a block-start padding on .day-body, which the print engine only paints
+    // on the first fragment of the (fragmented) body cell.
+    expect(srcdoc).toContain('.day-body  { padding: 0 28px 6px; }')
   })
 
   it('FE-COMP-TRIPPDF-006: escHtml prevents XSS in trip title', async () => {
@@ -255,13 +291,104 @@ describe('downloadTripPDF', () => {
     expect(iframe!.srcdoc).toContain('CONF999')
   })
 
-  it('FE-COMP-TRIPPDF-016: renders place description and price chip', async () => {
+  it('FE-COMP-TRIPPDF-016: renders place description and a currency-formatted price chip', async () => {
     await downloadTripPDF(richArgs)
     const iframe = getIframe()
     expect(iframe!.srcdoc).toContain('Ancient amphitheater')
-    // Price chip: 15 EUR
-    expect(iframe!.srcdoc).toContain('15')
-    expect(iframe!.srcdoc).toContain('EUR')
+    // richArgs trip has no explicit currency, place has no currency override —
+    // formatMoney falls back to EUR, formatted via Intl (symbol, not literal "EUR" text).
+    expect(iframe!.srcdoc).toContain('15,00')
+    expect(iframe!.srcdoc).toContain('€')
+  })
+
+  it('FE-COMP-TRIPPDF-016b: formats price chip and totals in the trip currency, not EUR', async () => {
+    const usdArgs = {
+      ...richArgs,
+      trip: { ...richArgs.trip, currency: 'USD' },
+    }
+    await downloadTripPDF(usdArgs)
+    const iframe = getIframe()
+    // Place price chip: place has no currency override, falls back to trip.currency (USD).
+    expect(iframe!.srcdoc).toContain('$15.00')
+    // No literal "EUR" text should leak into a USD trip's export.
+    expect(iframe!.srcdoc).not.toContain('EUR')
+    // Price chip icon must stay currency-neutral — not the euro-shaped glyph.
+    expect(iframe!.srcdoc).not.toContain('M14 5c-3.87 0-7 3.13-7 7s3.13 7 7 7c2.17 0 4.1-.99 5.4-2.55')
+  })
+
+  it('FE-COMP-TRIPPDF-016c: a place with its own currency overrides the trip currency for its price chip', async () => {
+    const mixedArgs = {
+      ...richArgs,
+      trip: { ...richArgs.trip, currency: 'EUR' },
+      assignments: {
+        '10': [{
+          ...assignmentForDay,
+          place: { ...placeWithDetails, currency: 'JPY', price: '1500' },
+        }],
+      } as any,
+    }
+    await downloadTripPDF(mixedArgs)
+    const iframe = getIframe()
+    // JPY is a zero-decimal currency (currencyDecimals) and uses its own symbol, not EUR.
+    // Note: Intl renders JPY with the fullwidth yen sign (U+FFE5 "￥"), not U+00A5 "¥".
+    expect(iframe!.srcdoc).toContain('￥1,500')
+  })
+
+  it('FE-COMP-TRIPPDF-016d: converts foreign-currency prices into the trip currency for day and cover totals (#1561)', async () => {
+    server.use(http.get('https://api.frankfurter.dev/v2/rates', ({ request }) => {
+      expect(new URL(request.url).searchParams.get('base')).toBe('NOK')
+      return HttpResponse.json([{ quote: 'USD', rate: 0.1 }]) // 1 NOK = 0.1 USD
+    }))
+    const mixedArgs = {
+      ...richArgs,
+      trip: { ...richArgs.trip, currency: 'NOK' },
+      assignments: {
+        '10': [
+          { ...assignmentForDay, place: { ...placeWithDetails, currency: 'USD', price: '273' } },
+          { ...assignmentForDay, id: 201, place: { ...placeWithDetails, id: 101, name: 'Museum', currency: null, price: '2500' } },
+        ],
+      } as any,
+    }
+    await downloadTripPDF(mixedArgs)
+    const srcdoc = getIframe()!.srcdoc.replace(/[\u00A0\u202F]/g, ' ')
+    // 2500 NOK + 273 USD / 0.1 = 5230 NOK, marked approximate, in day header AND cover stat.
+    expect(srcdoc).toContain('≈ 5 230,00 kr')
+    expect((srcdoc.match(/≈ 5 230,00 kr/g) || []).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('FE-COMP-TRIPPDF-016e: falls back to per-currency breakdowns when the FX fetch fails (#1561)', async () => {
+    server.use(http.get('https://api.frankfurter.dev/v2/rates', () => HttpResponse.error()))
+    const mixedArgs = {
+      ...richArgs,
+      trip: { ...richArgs.trip, currency: 'NOK' },
+      assignments: {
+        '10': [
+          { ...assignmentForDay, place: { ...placeWithDetails, currency: 'USD', price: '2730.27' } },
+          { ...assignmentForDay, id: 201, place: { ...placeWithDetails, id: 101, name: 'Museum', currency: null, price: '2500' } },
+        ],
+      } as any,
+    }
+    // Export still resolves — a dead FX endpoint must never break the PDF.
+    await expect(downloadTripPDF(mixedArgs)).resolves.not.toThrow()
+    const srcdoc = getIframe()!.srcdoc.replace(/[\u00A0\u202F]/g, ' ')
+    // Honest breakdown, base currency first; the USD amount is never NOK-labeled.
+    expect(srcdoc).toContain('2 500,00 kr + $2,730.27')
+    expect(srcdoc).not.toContain('≈')
+    expect(srcdoc).not.toMatch(/5 ?230/)
+  })
+
+  it('FE-COMP-TRIPPDF-016f: an all-same-currency trip makes no FX request', async () => {
+    let fxCalled = false
+    server.use(http.get('https://api.frankfurter.dev/v2/rates', () => {
+      fxCalled = true
+      return HttpResponse.json([])
+    }))
+    await downloadTripPDF({ ...richArgs, trip: { ...richArgs.trip, currency: 'EUR' } })
+    expect(fxCalled).toBe(false)
+    // Totals render exactly as before for the single-currency case.
+    const srcdoc = getIframe()!.srcdoc.replace(/[\u00A0\u202F]/g, ' ')
+    expect(srcdoc).toContain('15,00 €')
+    expect(srcdoc).not.toContain('≈')
   })
 
   it('FE-COMP-TRIPPDF-017: renders trip description on cover', async () => {
@@ -355,5 +482,36 @@ describe('downloadTripPDF', () => {
     const iframe = getIframe()
     // The empty-day div should appear (contains the translation key for empty day)
     expect(iframe!.srcdoc).toContain('dayplan.emptyDay')
+  })
+
+  it('FE-COMP-TRIPPDF-021: appends plugin pdf sections after the days, escaped', async () => {
+    server.use(
+      http.get('/api/pdf-sections/:tripId', () =>
+        HttpResponse.json({
+          sections: [{
+            pluginId: 'weather',
+            title: 'Weather <b>Forecast</b>',
+            paragraphs: ['Sunny all week'],
+            table: { headers: ['Day', 'Temp'], rows: [['Mon', '24°C']] },
+          }],
+        })
+      ),
+    )
+    await downloadTripPDF(richArgs)
+    const srcdoc = getIframe()!.srcdoc
+    expect(srcdoc).toContain('class="plugin-section"')
+    // Plugin text is escHtml'd like the core content — no markup passes through.
+    expect(srcdoc).not.toContain('<b>Forecast</b>')
+    expect(srcdoc).toContain('Weather &lt;b&gt;Forecast&lt;/b&gt;')
+    expect(srcdoc).toContain('Sunny all week')
+    expect(srcdoc).toContain('24°C')
+    // Sections come after the last day section.
+    expect(srcdoc.indexOf('class="plugin-sections')).toBeGreaterThan(srcdoc.lastIndexOf('class="day-section'))
+  })
+
+  it('FE-COMP-TRIPPDF-022: renders no plugin block when the sections fetch fails (fail-safe)', async () => {
+    server.use(http.get('/api/pdf-sections/:tripId', () => HttpResponse.error()))
+    await expect(downloadTripPDF(minimalArgs)).resolves.not.toThrow()
+    expect(getIframe()!.srcdoc).not.toContain('class="plugin-sections')
   })
 })

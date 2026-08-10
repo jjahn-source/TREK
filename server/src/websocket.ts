@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { db, canAccessTrip } from './db/database';
 import { consumeEphemeralTokenWithMeta } from './services/ephemeralTokens';
-import { emitPluginEvent } from './plugin-event-sink';
+import { emitPluginEvent, pluginEventMeta } from './plugin-event-sink';
 import { User } from './types';
 import http from 'node:http';
 
@@ -61,6 +61,13 @@ function setupWebSocket(server: http.Server): void {
 
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const nws = ws as NomadWebSocket;
+
+    // ws emits protocol violations (malformed frames, reserved close codes such as 1006)
+    // as an 'error' event on the socket; unhandled, Node rethrows it and the process dies.
+    // Must stay above the auth guards below: they close and return early, and a socket that
+    // never gets this listener can still crash the server before it finishes closing.
+    nws.on('error', () => nws.terminate());
+
     // Extract token from query param
     const url = new URL(req.url, 'http://localhost');
     const token = url.searchParams.get('token');
@@ -196,7 +203,7 @@ function broadcast(tripId: number | string, eventType: string, payload: Record<s
   // Announce every CORE trip event (name only, never the payload) to subscribed
   // plugins — before the room check so it fires even with no connected viewers, and
   // skipping plugin:* re-broadcasts so a plugin's own events can't loop back.
-  if (!eventType.startsWith('plugin:')) emitPluginEvent(tripId, eventType);
+  if (!eventType.startsWith('plugin:')) emitPluginEvent(tripId, eventType, pluginEventMeta(eventType, payload));
   const room = rooms.get(tripId);
   if (!room || room.size === 0) return;
 

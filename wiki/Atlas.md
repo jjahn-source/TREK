@@ -4,8 +4,6 @@ Atlas is an interactive world map that shows countries and regions you have visi
 
 > **Admin:** enable Atlas in [Admin-Addons](Admin-Addons).
 
-<!-- TODO: screenshot: world map with visited countries highlighted -->
-
 ![Atlas](assets/Atlas.png)
 
 ## What Atlas is
@@ -48,6 +46,12 @@ Your Atlas statistics panel shows:
 ## Visual effect
 
 The desktop glass panel at the bottom of the map uses a liquid-glass visual effect — a dynamic inner glow and border highlight that follows your cursor across the panel.
+
+## Plugin country layers
+
+Installed plugins can tint countries on the Atlas map with their own layers — for example wishlists or travel advisories. A plugin implements the `atlasLayerProvider` hook and returns one or more layers, each a set of ISO country codes with a tone; TREK validates the codes and tints them itself. Layers are per-user and additive: a plugin never touches the map canvas, and one that errors or is slow contributes nothing.
+
+> **Plugins:** requires the `hook:atlas-layer-provider` permission. See [Plugin-Development](Plugin-Development) for the hook contract.
 
 ## See also
 

@@ -61,30 +61,60 @@ export class PluginFrameController {
     const ext = path.extname(resolved).toLowerCase();
     res.setHeader('Content-Type', MIME[ext] ?? 'application/octet-stream');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', this.frameCsp(pluginId));
-    res.sendFile(resolved);
+    // The frame document runs at an OPAQUE origin (sandbox without
+    // allow-same-origin), so its own <script src>/<link> subresource loads are
+    // cross-origin — helmet's default CORP: same-origin makes the browser drop
+    // them (ERR_BLOCKED_BY_RESPONSE) and a multi-file client dies on boot.
+    // The sandbox + per-plugin CSP are the isolation boundary here, not CORP:
+    // these files are the plugin's own public client code.
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Content-Security-Policy', this.frameCsp(pluginId, req.get('host')));
+    // Explicit { root } + basename, not the absolute path: under the Nest
+    // ExpressAdapter, res.sendFile(absolutePath) resolves against the rewritten
+    // req.url and 404s spuriously (same trap as files-download.controller.ts).
+    res.sendFile(path.basename(resolved), { root: path.dirname(resolved) });
   }
 
   /** Per-plugin, locked-down CSP for the sandboxed frame document. */
-  private frameCsp(pluginId: string): string {
-    // Defense in depth: the manifest validator already constrains these hosts, but
-    // never interpolate anything that isn't a clean host/wildcard into connect-src
-    // (a stray space or `*` would inject an extra CSP source token).
-    const outbound = this.runtime
-      .outboundHostsOf(pluginId)
-      .filter((h) => /^(\*\.[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9-]+(\.[a-z0-9-]+)*)$/i.test(h));
+  private frameCsp(pluginId: string, host: string | undefined): string {
+    // The frame must be able to reach exactly what the CHILD may reach. The child's egress
+    // guard is the union of the manifest's http:outbound:<host> grants AND the hosts an admin
+    // added post-install for an operatorEgress plugin (plugin-runtime.service: activate()).
+    // Building connect-src from the grants alone left an operatorEgress plugin WITH A UI able
+    // to call the operator's host from its server but CSP-blocked in its own iframe. The admin
+    // consented to these hosts at install and the child already reaches them, so matching the
+    // frame to the child widens no trust boundary that isn't already crossed.
+    //
+    // Defense in depth: both sources are validated upstream (the manifest validator; the
+    // admin writer's EGRESS_HOST_RE), but never interpolate anything that isn't a clean
+    // host/wildcard into connect-src — a stray space or `*` would inject an extra CSP source.
+    const outbound = [
+      ...new Set([...this.runtime.outboundHostsOf(pluginId), ...this.runtime.operatorEgressHosts(pluginId)]),
+    ].filter((h) => /^(\*\.[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9-]+(\.[a-z0-9-]+)*)$/i.test(h));
+    // The frame runs at an OPAQUE origin (sandbox without allow-same-origin), so
+    // 'self' matches nothing and the plugin's own <script src>/<link> files would
+    // be blocked — a multi-file client build (Vite/React output) only worked
+    // inlined. A scheme-less host-source pinned to THIS plugin's frame path
+    // re-allows exactly its own assets and still no other host. Both interpolated
+    // parts are charset-checked so a stray token can't widen the policy (the
+    // Host header is client-controlled; a forged one only lames the forger's own
+    // response), and a missing/odd Host just falls back to inline-only.
+    const ownAssets =
+      host && /^[a-z0-9.-]+(:\d+)?$/i.test(host) && /^[a-z][a-z0-9-]{2,39}$/.test(pluginId)
+        ? ` ${host}/plugin-frame/${pluginId}/`
+        : '';
     const connect = ["'self'", ...outbound.map((h) => `https://${h}`)].join(' ');
     return [
       "default-src 'none'",
-      // The frame runs at an OPAQUE origin (sandbox without allow-same-origin),
-      // so 'self' matches nothing — inline is the only way its own script can run.
-      // Safe here: the sandbox (not this script-src) is the isolation boundary,
-      // and the plugin author controls the frame's code either way.
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      `connect-src ${connect}`,
+      // 'unsafe-inline' is safe here: the sandbox (not this script-src) is the
+      // isolation boundary, and the plugin author controls the frame's code
+      // either way. What script-src must keep doing is denying REMOTE hosts —
+      // a script URL is an egress channel connect-src never sees.
+      `script-src 'self' 'unsafe-inline'${ownAssets}`,
+      `style-src 'self' 'unsafe-inline'${ownAssets}`,
+      `img-src 'self' data: blob:${ownAssets}`,
+      `font-src 'self' data:${ownAssets}`,
+      `connect-src ${connect}${ownAssets}`,
       "frame-ancestors 'self'",
       "base-uri 'none'",
       "form-action 'self'",

@@ -6,9 +6,10 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAddonStore } from '../../store/addonStore'
 import { usePluginStore } from '../../store/pluginStore'
 import { useTranslation } from '../../i18n'
-import { Plane, LogOut, Settings, ChevronDown, Shield, ArrowLeft, Users, Moon, Sun, Monitor, CalendarDays, Briefcase, Globe, Compass, BookOpen, Bookmark, Blocks } from 'lucide-react'
+import { Plane, LogOut, Settings, ChevronDown, Shield, ArrowLeft, Users, Moon, Sun, Monitor, CalendarDays, Briefcase, Globe, Compass, BookOpen, Bookmark } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import InAppNotificationBell from './InAppNotificationBell.tsx'
+import { resolvePluginIcon } from '../shared/PluginIcon'
 
 const ADDON_ICONS: Record<string, LucideIcon> = { CalendarDays, Briefcase, Globe, Compass, Bookmark }
 
@@ -150,7 +151,7 @@ export default function Navbar({ tripTitle, tripId, onBack, showBack, onShare }:
         >
           {[{ id: '__trips', path: '/dashboard', label: t('nav.myTrips'), Icon: Briefcase },
             ...globalAddons.map(a => ({ id: a.id, path: `/${a.id}`, label: getAddonName(a), Icon: ADDON_ICONS[a.icon] || CalendarDays })),
-            ...pagePlugins.map(p => ({ id: `plugin:${p.id}`, path: `/plugins/${p.id}`, label: p.name, Icon: Blocks }))
+            ...pagePlugins.map(p => ({ id: `plugin:${p.id}`, path: `/plugins/${p.id}`, label: p.name, Icon: resolvePluginIcon(p.icon) }))
           ].map(tab => {
             const isActive = location.pathname === tab.path
             return (
@@ -170,6 +171,21 @@ export default function Navbar({ tripTitle, tripId, onBack, showBack, onShare }:
             )
           })}
         </div>
+      )}
+
+      {/* Centre slot for page-scoped notices (plugin trip warnings portal into it).
+          Only mounted on trip pages, where the tab pill above is absent, so the two
+          never fight over the centre. Zero-size while empty; pointer events stay off
+          on the wrapper so an empty slot can't swallow clicks. */}
+      {tripTitle && (
+        <div
+          id="trek-nav-center-slot"
+          style={{
+            position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+            display: 'flex', alignItems: 'center', gap: 6, maxWidth: '42%',
+            overflow: 'hidden', pointerEvents: 'none',
+          }}
+        />
       )}
 
       {/* Spacer */}

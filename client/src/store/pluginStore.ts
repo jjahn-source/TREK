@@ -12,7 +12,13 @@ export interface ActivePlugin {
   name: string
   type: 'integration' | 'page' | 'widget' | 'trip-page'
   icon: string | null
-  slot?: 'sidebar' | 'hero' | 'place-detail'
+  slot?: 'sidebar' | 'hero' | 'place-detail' | 'day-detail' | 'reservation-detail'
+  /** How a trip-page plugin sits in the planner tab bar: which core tabs it
+   * replaces while active ('plan' never — enforced server-side) and its
+   * preferred 0-based tab index. */
+  tripPage?: { replaces?: string[]; position?: number }
+  /** The plugin ships a settings.html the user-settings page frames. */
+  settingsUi?: true
 }
 
 interface PluginState {
@@ -42,7 +48,7 @@ export const usePluginStore = create<PluginState>((set, get) => ({
 
   getById: (id) => get().plugins.find((p) => p.id === id),
   pages: () => get().plugins.filter((p) => p.type === 'page'),
-  widgets: () => get().plugins.filter((p) => p.type === 'widget' && p.slot !== 'hero' && p.slot !== 'place-detail'),
+  widgets: () => get().plugins.filter((p) => p.type === 'widget' && p.slot !== 'hero' && p.slot !== 'place-detail' && p.slot !== 'day-detail' && p.slot !== 'reservation-detail'),
   heroWidgets: () => get().plugins.filter((p) => p.type === 'widget' && p.slot === 'hero'),
   tripPages: () => get().plugins.filter((p) => p.type === 'trip-page'),
   placeDetailWidgets: () => get().plugins.filter((p) => p.type === 'widget' && p.slot === 'place-detail'),

@@ -3483,6 +3483,224 @@ function runMigrations(db: Database.Database): void {
         if (!err.message?.includes('duplicate column name')) throw err;
       }
     },
+    // Per-user plugin settings (#plugins). A plugin can declare `scope:'user'`
+    // settings fields (e.g. an API key or a personal preference); each USER stores
+    // their own values here, separate from the admin-owned instance `plugins.config`.
+    // Secrets are encrypted with the same apiKeyCrypto as instance secrets and are
+    // never echoed back to the client (masked). Runtime reads the acting user's row.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_user_config (
+          plugin_id TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          config TEXT NOT NULL DEFAULT '{}',
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (plugin_id, user_id)
+        );
+      `);
+    },
+    // Host-brokered outbound OAuth (#plugins). A plugin becomes an OAuth *client* of a
+    // third-party service; the HOST runs authorize->callback->token->refresh with
+    // PKCE+state and owns the tokens — the plugin never sees the refresh token. Tokens
+    // are per-user + encrypted at rest; the in-flight PKCE verifier/state is short-lived.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_oauth_tokens (
+          plugin_id TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          access_token TEXT,
+          refresh_token TEXT,
+          expires_at INTEGER,
+          scope TEXT,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (plugin_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS plugin_oauth_state (
+          state TEXT PRIMARY KEY,
+          plugin_id TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          verifier TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+      `);
+    },
+    // Persistent plugin scheduler (#plugins). A plugin with the existing `jobs:run`
+    // grant can schedule a userless callback to fire at a future time (once, or
+    // recurring), surviving server restarts because the entry lives here. Same risk
+    // class as cron jobs (no user, no trip reads, own db + declared egress only) —
+    // so it rides on `jobs:run`, no new consent. UNIQUE(plugin_id, name) makes
+    // scheduler.set an upsert and cancel deterministic. Rows are purged on uninstall.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_scheduled_tasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          plugin_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          due_at INTEGER NOT NULL,
+          payload TEXT NOT NULL DEFAULT 'null',
+          every_ms INTEGER,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (plugin_id, name)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_plugin_sched_due ON plugin_scheduled_tasks (due_at);');
+    },
+    // Durable GDPR erasure queue (#plugins). When a TREK account is deleted, every
+    // installed plugin holding `hook:user-data` gets a pending row here so its own
+    // deleteUserData handler runs even if the plugin was offline at delete time —
+    // erasure must not be lost across a restart, so it is persisted (unlike the
+    // best-effort event buffer). The row is removed once the plugin acknowledges,
+    // and all of a plugin's rows are purged on uninstall. UNIQUE(plugin_id, user_id)
+    // makes re-enqueue idempotent.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_user_erasure_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          plugin_id TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (plugin_id, user_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_plugin_erasure_plugin ON plugin_user_erasure_queue (plugin_id);');
+    },
+
+    // Tombstones for Atlas countries the user has explicitly removed (#1490).
+    // Atlas derives visited countries from trip places and transport endpoints on every
+    // request, so those countries have no row to delete — "Remove" deleted from
+    // visited_countries (which never had the row), the client hid it optimistically, and
+    // the next getStats re-derived it. Recording the removal here lets getStats suppress
+    // a derived country. Re-marking a country deletes its tombstone.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS hidden_countries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          country_code TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (user_id, country_code)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_hidden_countries_user ON hidden_countries (user_id);');
+    },
+
+    // Operator-supplied egress hosts for a plugin (#plugins).
+    // A plugin's egress allow-list is fixed in its manifest at publish time, but a plugin
+    // that talks to a SELF-HOSTED service (Gotify, ntfy, …) cannot know the operator's
+    // hostname — so a community plugin could serve nobody. These rows let the ADMIN add
+    // hosts post-install; the runtime unions them into the child's allow-list at spawn.
+    // Consent stays with the admin (never the end user), exactly as for manifest egress.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_egress_hosts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          plugin_id TEXT NOT NULL,
+          host TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (plugin_id, host)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_plugin_egress_hosts_plugin ON plugin_egress_hosts (plugin_id);');
+      // Whether the plugin DECLARED that it needs operator-supplied hosts. Only such a
+      // plugin may have hosts added — an admin can never widen egress for a plugin that
+      // never asked for it, so the install-time consent still bounds what's possible.
+      const columns = db.prepare("PRAGMA table_info('plugins')").all() as Array<{ name: string }>;
+      if (!columns.some((c) => c.name === 'operator_egress')) {
+        db.exec('ALTER TABLE plugins ADD COLUMN operator_egress INTEGER NOT NULL DEFAULT 0;');
+      }
+    },
+
+    // Settings-page action buttons a plugin contributes ("Test connection", "Sync now").
+    // Descriptors only — the handler lives in the plugin's code and is invoked host-side
+    // with the CLICKING user bound, so it can read that user's own settings.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS plugin_actions (
+          plugin_id TEXT NOT NULL,
+          action_key TEXT NOT NULL,
+          label TEXT NOT NULL,
+          hint TEXT,
+          danger INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (plugin_id, action_key)
+        );
+      `);
+    },
+
+    // Why a plugin's update was REFUSED by the signature check (#plugins). A refused
+    // update leaves a working plugin pinned at its old version — previously the reason
+    // lived only in a transient toast, so the plugin quietly stopped updating and the
+    // admin had to re-attempt an update to rediscover why. Record it instead.
+    //
+    // `update_block_version` is the registry version that was refused: once the registry
+    // offers something NEWER, the block describes an artifact nobody is being offered
+    // anymore, so it reads as stale and the admin can just re-attempt (the next install
+    // re-verifies and either succeeds or re-blocks with fresh values). Deliberately no
+    // `status = 'error'` — the plugin still runs fine on its old code.
+    () => {
+      for (const col of ['update_block_code TEXT', 'update_block_detail TEXT', 'update_block_version TEXT']) {
+        try {
+          db.exec(`ALTER TABLE plugins ADD COLUMN ${col};`);
+        } catch (err) {
+          console.warn('[migrations] Non-fatal migration step failed:', err);
+        }
+      }
+    },
+
+    // The semver RANGE of TREK versions a plugin declares it supports (its manifest's
+    // `trek`, e.g. ">=3.2.0 <4.0.0"). The existing `min_trek_version` only carries the
+    // lower bound, so it cannot express "stops working at 4.0" — which is precisely the
+    // case the activation gate has to catch after a TREK upgrade. Kept nullable: a plugin
+    // installed before this column existed has no range recorded, and the gate refuses to
+    // activate it rather than guessing (see TREK_VERSION_UNKNOWN).
+    () => {
+      try {
+        db.exec('ALTER TABLE plugins ADD COLUMN trek_range TEXT;');
+      } catch (err) {
+        console.warn('[migrations] Non-fatal migration step failed:', err);
+      }
+    },
+
+    // `place_regions` is a re-derivable Nominatim cache, only ever populated for a place ID
+    // that isn't already cached — so a wrong row, once written, was permanent. Region
+    // resolution now resolves a place's lat/lng directly against the bundled admin1 polygons
+    // (the same ones the client renders) instead of trusting Nominatim's address level, which
+    // could name a subdivision level the bundle doesn't carry (Barcelona's ES-B province vs
+    // the bundle's ES-CT autonomous community) and never highlight. That fix only helps
+    // places re-resolved after it, so clear the cache once and let every place re-resolve on
+    // the next Atlas load. The country_code stored alongside is cleared too, which also drops
+    // the old wrong-country rows a US-state-abbreviation address used to produce.
+    () => {
+      try {
+        db.exec('DELETE FROM place_regions');
+      } catch (err) {
+        // place_regions is created by an earlier migration; tolerate its absence on an
+        // unusual partial DB rather than aborting startup.
+        if (!(err instanceof Error) || !err.message.includes('no such table')) throw err;
+      }
+    },
+
+    // Tombstones for Atlas regions the user has explicitly removed — the region-level
+    // counterpart to hidden_countries above (#1490). A visited region is normally derived
+    // fresh from place_regions/visited_regions on every request, so "removing" it has
+    // nothing to delete; recording it here lets getVisitedRegions suppress a derived region
+    // the same way getStats already suppresses a derived country. Unlike the country-level
+    // tombstone (originally only reachable for a manually-marked or zero-count country),
+    // this also covers a region derived from real place data — e.g. one that ended up on
+    // the wrong side of a border-simplification gap and the user just wants gone.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS hidden_regions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          region_code TEXT NOT NULL,
+          country_code TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (user_id, region_code)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_hidden_regions_user ON hidden_regions (user_id);');
+    },
   ];
 
   if (currentVersion < migrations.length) {

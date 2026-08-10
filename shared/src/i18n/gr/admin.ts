@@ -214,6 +214,13 @@ const admin: TranslationStrings = {
   'admin.plugins.dropToUpload': 'Αποθέστε ένα .zip plugin για εγκατάσταση',
   'admin.plugins.uploaded': 'Το plugin “{name}” μεταφορτώθηκε — ενεργοποιήστε το για εκτέλεση',
   'admin.plugins.sideloaded': 'Φορτώθηκε χειροκίνητα',
+  'admin.plugins.devLinkBadge': 'Dev-Link',
+  'admin.plugins.devLinkHint':
+    'Φορτώνεται από τοπικό κατάλογο build και επαναφορτώνεται ζωντανά με πραγματικά δεδομένα — μόνο για ανάπτυξη',
+  'admin.plugins.devLinkTitle': 'Σύνδεση τοπικού πρόσθετου',
+  'admin.plugins.devLinkPathPlaceholder': '/absolute/path/to/your/plugin',
+  'admin.plugins.devLinkButton': 'Σύνδεση',
+  'admin.plugins.devLinkLinked': '{id} συνδέθηκε — ενεργοποιήστε το για εκτέλεση',
   'admin.plugins.sideloadedHint': 'Μεταφορτώθηκε χειροκίνητα — όχι από το μητρώο, χωρίς υπογραφή και έλεγχο',
   'admin.plugins.browse': 'Περιήγηση σε plugins',
   'admin.plugins.installed': 'Εγκατεστημένο',
@@ -226,6 +233,18 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Το plugin απενεργοποιήθηκε',
   'admin.plugins.viewErrors': 'Προβολή αρχείου σφαλμάτων',
   'admin.plugins.errorLog': 'Αρχείο σφαλμάτων',
+  'admin.plugins.allowedHosts': 'Επιτρεπόμενοι κόμβοι',
+  'admin.plugins.allowedHosts.hint':
+    'Αυτό το πρόσθετο επικοινωνεί με μια υπηρεσία που μόνο εσείς μπορείτε να ονομάσετε (αυτο-φιλοξενούμενος διακομιστής). Προσθέστε τους κόμβους που μπορεί να προσεγγίσει — κανέναν άλλον.',
+  'admin.plugins.allowedHosts.none': 'Δεν έχουν προστεθεί κόμβοι ακόμη.',
+  'admin.plugins.allowedHosts.unsupported':
+    'Αυτό το πρόσθετο δεν χρησιμοποιεί κόμβους που ορίζει ο διαχειριστής. Οι επιτρεπόμενοι κόμβοι του είναι σταθεροί στο manifest.',
+  'admin.plugins.allowedHosts.restartNote': 'Η αποθήκευση επανεκκινεί το πρόσθετο ώστε να λάβει τη νέα λίστα.',
+  'admin.plugins.allowedHosts.add': 'Προσθήκη επιτρεπόμενου κόμβου',
+  'admin.plugins.allowedHosts.count': '{n} επιτρεπόμενοι κόμβοι',
+  'admin.plugins.operatorEgressPill': '+ κόμβοι που προσθέτετε',
+  'admin.plugins.operatorEgressHint':
+    'Αυτό το πρόσθετο επικοινωνεί με μια υπηρεσία που μόνο εσείς μπορείτε να ονομάσετε (αυτο-φιλοξενούμενος διακομιστής). Μετά την εγκατάσταση προσθέστε τους κόμβους στο ⋯ → Επιτρεπόμενοι κόμβοι. Κανέναν άλλον.',
   'admin.plugins.noErrors': 'Δεν έχουν καταγραφεί σφάλματα.',
   'admin.plugins.uninstalled': 'Το plugin απεγκαταστάθηκε',
   'admin.plugins.uninstallTitle': 'Απεγκατάσταση plugin;',
@@ -267,6 +286,7 @@ const admin: TranslationStrings = {
   'admin.plugins.scope.user': 'Ανά χρήστη',
   'admin.plugins.fieldRequired': 'Υποχρεωτικό',
   'admin.plugins.sourceRepo': 'Αποθετήριο πηγαίου κώδικα',
+  'admin.plugins.reportIssue': 'Αναφορά προβλήματος',
   'admin.plugins.homepage': 'Αρχική σελίδα',
   'admin.plugins.requiresTrek': 'Απαιτεί TREK {version}+',
   'admin.plugins.reviewedOn': 'Ελέγχθηκε {date}',
@@ -276,7 +296,55 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.db:read:costs':
     'Ανάγνωση εξόδων (στοιχεία προϋπολογισμού) στα οποία έχει πρόσβαση ο ενεργός χρήστης',
   'admin.plugins.perm.db:read:packing': 'Ανάγνωση λιστών αποσκευών ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης',
+  'admin.plugins.perm.db:write:packing':
+    'Δημιουργία, επεξεργασία και διαγραφή αντικειμένων λίστας αποσκευών σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
+  'admin.plugins.perm.weather:read':
+    'Ανάγνωση της προσωρινά αποθηκευμένης πρόγνωσης καιρού του κεντρικού υπολογιστή (ανά συντεταγμένες)',
+  'admin.plugins.perm.db:read:categories': 'Ανάγνωση της γενικής λίστας κατηγοριών τοποθεσιών',
+  'admin.plugins.perm.db:read:tags': 'Ανάγνωση των ετικετών του ενεργού χρήστη',
+  'admin.plugins.perm.db:write:tags': 'Δημιουργία, επεξεργασία και διαγραφή των ετικετών του ενεργού χρήστη',
+  'admin.plugins.perm.db:read:todos': 'Ανάγνωση των εργασιών ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης',
+  'admin.plugins.perm.db:write:todos':
+    'Δημιουργία, επεξεργασία και διαγραφή εργασιών σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
+  'admin.plugins.perm.db:write:atlas':
+    'Επισήμανση χωρών και περιοχών ως επισκεφθέντων και διαχείριση της λίστας επιθυμιών του ενεργού χρήστη (απαιτεί το πρόσθετο Atlas)',
+  'admin.plugins.perm.db:write:vacay':
+    'Εναλλαγή ημερών άδειας και εταιρικών αργιών στο ενεργό πλάνο του ενεργού χρήστη (απαιτεί το πρόσθετο Vacay)',
+  'admin.plugins.perm.db:write:journal':
+    'Δημιουργία, επεξεργασία και διαγραφή καταχωρήσεων σε ημερολόγια που μπορεί να επεξεργαστεί ο ενεργός χρήστης (απαιτεί το πρόσθετο Journey)',
+  'admin.plugins.perm.db:write:collections':
+    'Δημιουργία και επεξεργασία συλλογών και αποθήκευση τοποθεσιών σε αυτές, με τον ρόλο συλλογής του ενεργού χρήστη (απαιτεί το πρόσθετο Collections)',
+  'admin.plugins.perm.db:write:files':
+    'Επισύναψη αρχείων σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης (όριο 10 MB, αποκλεισμένες επεκτάσεις απορρίπτονται) και διαχείριση των συνδέσμων τους',
+  'admin.plugins.perm.db:write:collab':
+    'Δημοσίευση σημειώσεων, ψηφοφοριών και μηνυμάτων συνομιλίας σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης (απαιτεί το πρόσθετο Collab)',
+  'admin.plugins.perm.db:write:members':
+    'Προσθήκη χρηστών σε ταξίδια — παρέχει πρόσβαση στο ταξίδι· προστατεύεται από το δικαίωμα διαχείρισης μελών του ενεργού χρήστη',
+  'admin.plugins.perm.notify:send':
+    'Αποστολή ειδοποίησης (εισερχόμενα κουδουνιού + email/ntfy) στον ενεργό χρήστη ή σε ταξίδι στο οποίο ανήκει — ποτέ σε αυθαίρετο παραλήπτη',
+  'admin.plugins.perm.ai:invoke':
+    'Χρήση του παρόχου AI που ρύθμισε ο διαχειριστής (συμπλήρωση κειμένου + εξαγωγή εγγράφων) εκ μέρους του ενεργού χρήστη — το πρόσθετο δεν κρατά ποτέ κλειδί',
+  'admin.plugins.perm.oauth:client':
+    'Σύνδεση σε υπηρεσία τρίτου εκ μέρους σας μέσω OAuth με διαμεσολάβηση του κεντρικού υπολογιστή (ο κεντρικός υπολογιστής κρατά τα διακριτικά, το πρόσθετο δεν τα βλέπει ποτέ)',
   'admin.plugins.perm.db:read:files': 'Ανάγνωση αρχείων ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης',
+  'admin.plugins.perm.db:write:reservations':
+    'Δημιουργία, επεξεργασία και διαγραφή κρατήσεων σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
+  'admin.plugins.perm.db:write:accommodations':
+    'Δημιουργία, επεξεργασία και διαγραφή καταλυμάτων σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
+  'admin.plugins.perm.db:read:journal':
+    'Ανάγνωση των ημερολογίων ταξιδιού του ενεργού χρήστη (απαιτεί το πρόσθετο Journey)',
+  'admin.plugins.perm.db:read:atlas':
+    'Ανάγνωση των χωρών και περιοχών που έχει επισκεφθεί ο ενεργός χρήστης (απαιτεί το πρόσθετο Atlas)',
+  'admin.plugins.perm.db:read:vacay':
+    'Ανάγνωση του προγράμματος διακοπών του ενεργού χρήστη (απαιτεί το πρόσθετο Vacay)',
+  'admin.plugins.perm.db:read:daynotes':
+    'Ανάγνωση των σημειώσεων ημέρας ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης',
+  'admin.plugins.perm.db:read:collections':
+    'Ανάγνωση των συλλογών αποθηκευμένων τοποθεσιών του ενεργού χρήστη (απαιτεί το πρόσθετο Collections)',
+  'admin.plugins.perm.db:write:daynotes':
+    'Δημιουργία, επεξεργασία και διαγραφή σημειώσεων ημέρας σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
+  'admin.plugins.perm.jobs:run':
+    'Εκτέλεση των δηλωμένων εργασιών παρασκηνίου βάσει προγράμματος (χωρίς περιβάλλον χρήστη — δεν μπορεί να διαβάσει δεδομένα χρήστη)',
   'admin.plugins.perm.db:write:costs':
     'Δημιουργία εξόδων (στοιχεία προϋπολογισμού) σε ταξίδια που μπορεί να επεξεργαστεί ο ενεργός χρήστης',
   'admin.plugins.perm.db:write:places':
@@ -297,9 +365,30 @@ const admin: TranslationStrings = {
     'Συνεισφορά επιπλέον λεπτομερειών (κριτικές, βαθμολογίες, σύνδεσμοι) σε ένα μέρος',
   'admin.plugins.perm.hook:trip-warning-provider':
     'Εμφάνιση προειδοποιήσεων επικύρωσης σε ένα ταξίδι (εμφανίζονται στον σχεδιαστή)',
+  'admin.plugins.perm.hook:table-contributor':
+    'Προσθήκη στηλών και ενεργειών στις προβολές του ταξιδιού (κρατήσεις, τοποθεσίες, ημέρες)',
+  'admin.plugins.perm.hook:map-marker-provider':
+    'Προσθήκη δεικτών στον χάρτη του ταξιδιού (π.χ. εμφάνιση κρατήσεων ή POI)',
+  'admin.plugins.perm.hook:pdf-section-provider': 'Προσθήκη ενοτήτων κειμένου στην εξαγωγή PDF του ταξιδιού',
+  'admin.plugins.perm.hook:atlas-layer-provider':
+    'Επισήμανση χωρών στον παγκόσμιο χάρτη του Άτλαντα (π.χ. λίστες επιθυμιών ή ταξιδιωτικές οδηγίες)',
+  'admin.plugins.perm.hook:journal-entry-provider':
+    'Προσθήκη επιπλέον γραμμών (σύνδεσμοι, στατιστικά) στις καταχωρίσεις του ημερολογίου',
+  'admin.plugins.perm.hook:user-data':
+    'Διαγραφή ή εξαγωγή των δεδομένων που αποθηκεύει για έναν χρήστη (GDPR: διαγραφή λογαριασμού και αιτήματα δεδομένων)',
+  'admin.plugins.perm.hook:trip-card-provider':
+    'Προσθήκη μικρών σημάτων (κατάσταση, μετρήσεις) στις κάρτες ταξιδιού του πίνακα',
+  'admin.plugins.perm.hook:notification-channel': 'Παράδοση των ειδοποιήσεών σας μέσω πρόσθετου καναλιού',
   'admin.plugins.perm.events:subscribe':
     'Αντιδρά σε βασικά συμβάντα δραστηριότητας (όνομα συμβάντος + ταξίδι μόνο, ποτέ το περιεχόμενο)',
   'admin.plugins.perm.http:outbound': 'Εκτέλεση εξερχόμενων αιτημάτων προς τους δηλωμένους hosts του',
+  'admin.plugins.perm.db:read:collab':
+    'Ανάγνωση σημειώσεων, ψηφοφοριών και μηνυμάτων συνομιλίας ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης (απαιτεί το πρόσθετο Collab)',
+  'admin.plugins.perm.db:read:files:content':
+    'Ανάγνωση του περιεχομένου (bytes) των αρχείων ταξιδιών στα οποία έχει πρόσβαση ο ενεργός χρήστης',
+  'admin.plugins.perm.db:create:trips': 'Δημιουργία νέων ταξιδιών που ανήκουν στον ενεργό χρήστη',
+  'admin.plugins.perm.rates:read':
+    'Ανάγνωση των προσωρινά αποθηκευμένων συναλλαγματικών ισοτιμιών του κεντρικού υπολογιστή',
   'admin.plugins.updateConsentTitle': 'Αυτή η ενημέρωση χρειάζεται νέα δικαιώματα',
   'admin.plugins.updateConsentBody':
     'Το {name} v{version} ζητά δικαιώματα που δεν έχετε ακόμη παραχωρήσει. Η νέα έκδοση έχει εγκατασταθεί αλλά παραμένει ανενεργή μέχρι να την εγκρίνετε.',
@@ -326,6 +415,34 @@ const admin: TranslationStrings = {
   'admin.plugins.security.reviewedTitle': 'Τι σημαίνει το "Ελεγμένο"',
   'admin.plugins.security.reviewedBody':
     'Ένα ελεγμένο plugin σαρώθηκε χειροκίνητα για κακόβουλο λογισμικό από έναν συντηρητή του TREK σε κάθε έκδοση — ελέγχθηκε για εχθρικό κώδικα, όχι για το αν λειτουργεί καλά. Δεν αποτελεί υπόσχεση ότι το plugin είναι ακίνδυνο.',
+  'admin.plugins.security.signedTitle': 'Τι σημαίνει το "Υπογεγραμμένο"',
+  'admin.plugins.security.signedBody':
+    'Το checksum που επαληθεύει το TREK σε κάθε εγκατάσταση αποδεικνύει ότι τα αρχεία είναι ακριβώς αυτά για τα οποία εγγυάται το μητρώο. Μια υπογραφή αποδεικνύει κάτι διαφορετικό: ότι προέρχονται από τον δημιουργό, υπογεγραμμένα με ένα κλειδί που κατέχει μόνο εκείνος. Ένα υπογεγραμμένο plugin έχει και τα δύο. Ένα ανυπόγραφο δεν είναι επικίνδυνο — απλώς φέρει μία εγγύηση λιγότερη, και τα περισσότερα plugins στο μητρώο είναι σήμερα ανυπόγραφα.',
+  'admin.plugins.signed': 'Υπογεγραμμένο',
+  'admin.plugins.signedHint': 'Επαληθεύτηκε με το κλειδί υπογραφής του δημιουργού κατά την εγκατάσταση',
+  'admin.plugins.unsigned': 'Ανυπόγραφο',
+  'admin.plugins.unsignedHint':
+    'Τα αρχεία ταιριάζουν με αυτά για τα οποία εγγυάται το μητρώο, αλλά τίποτα δεν τα συνδέει με τον δημιουργό. Μία εγγύηση λιγότερη — όχι επικίνδυνο.',
+  'admin.plugins.updateBlocked': 'Η ενημέρωση μπλοκαρίστηκε — {reason}',
+  'admin.plugins.reviewBlock': 'Έλεγχος',
+  'admin.plugins.retrusted': 'Το νέο κλειδί υπογραφής έγινε αποδεκτό — το plugin ενημερώθηκε',
+  'admin.plugins.sig.title': 'Η υπογραφή του {name} δεν μπόρεσε να επαληθευτεί',
+  'admin.plugins.sig.keyChangedBody':
+    'Το κλειδί υπογραφής του δημιουργού δεν είναι αυτό με το οποίο εγκαταστάθηκε αυτό το plugin. Οι δημιουργοί όντως αλλάζουν κλειδιά — αλλά ένας επιτιθέμενος που θα είχε καταλάβει το plugin θα έμοιαζε ακριβώς έτσι.',
+  'admin.plugins.sig.invalidBody':
+    'Τα αρχεία δεν ταιριάζουν με την υπογραφή του δημιουργού. Δεν είναι αυτά που υπέγραψε ο δημιουργός — είτε αλλοιώθηκαν, είτε παραποιήθηκαν. Αυτό δεν μπορεί να παρακαμφθεί.',
+  'admin.plugins.sig.missingBody':
+    'Αυτό το plugin ήταν υπογεγραμμένο όταν το εγκαταστήσατε, αλλά η νέα έκδοση δεν περιλαμβάνει καμία υπογραφή. Το TREK δεν θα δεχτεί σιωπηλά αυτή την υποβάθμιση. Αυτό δεν μπορεί να παρακαμφθεί.',
+  'admin.plugins.sig.incompleteBody':
+    'Η καταχώριση στο μητρώο είναι μισοϋπογεγραμμένη: δηλώνει κλειδί δημιουργού αλλά η έκδοση δεν φέρει υπογραφή (ή το αντίστροφο). Αυτό είναι σφάλμα από την πλευρά του plugin. Αυτό δεν μπορεί να παρακαμφθεί.',
+  'admin.plugins.sig.pinnedKey': 'Κλειδί με το οποίο εγκαταστάθηκε',
+  'admin.plugins.sig.newKey': 'Κλειδί που προσφέρει τώρα',
+  'admin.plugins.sig.confirmOutOfBand':
+    'Το TREK δεν μπορεί να ξεχωρίσει μια νόμιμη αλλαγή κλειδιού από μια κατάληψη — από εδώ φαίνονται πανομοιότυπες. Επιβεβαιώστε το νέο κλειδί με τον δημιουργό μέσω ενός καναλιού που ήδη εμπιστεύεστε, προτού το αποδεχτείτε. Μόλις το κάνετε, το plugin ενημερώνεται και το νέο κλειδί απομνημονεύεται.',
+  'admin.plugins.sig.retrustConfirm': 'Εμπιστοσύνη στο νέο κλειδί & ενημέρωση',
+  'admin.plugins.sig.cancel': 'Να μην γίνει αποδεκτό',
+  'admin.plugins.sig.consentUnsigned':
+    'Τίποτα δεν συνδέει αυτή την έκδοση με τον δημιουργό της — τα αρχεία ταιριάζουν με το μητρώο, αλλά δεν φέρουν υπογραφή δημιουργού.',
   'admin.plugins.security.trustTitle': 'Το συμπέρασμα',
   'admin.plugins.security.trustBody':
     'Η εγκατάσταση ενός plugin είναι σαν την εγκατάσταση οποιασδήποτε εφαρμογής τρίτου: προσθέστε κώδικα μόνο από δημιουργούς που εμπιστεύεστε, και σε περίπτωση αμφιβολίας, ελέγξτε τον πρώτα μόνοι σας. Το TREK δεν αναλαμβάνει καμία ευθύνη για plugins τρίτων.',
@@ -342,6 +459,7 @@ const admin: TranslationStrings = {
   'admin.plugins.sortName': 'Όνομα',
   'admin.plugins.sortRecent': 'Πρόσφατα ενημερωμένα',
   'admin.plugins.sortUpdates': 'Ενημερώσεις πρώτα',
+  'admin.plugins.sortDownloads': 'Περισσότερες λήψεις',
   'admin.plugins.updatesAvailable': 'Διαθέσιμες {count} ενημερώσεις για τα plugins σας.',
   'admin.plugins.updateAll': 'Ενημέρωση όλων',
   'admin.plugins.noMatchInstalled': 'Κανένα εγκατεστημένο plugin δεν ταιριάζει με την αναζήτησή σας.',
@@ -362,7 +480,11 @@ const admin: TranslationStrings = {
   'admin.plugins.cap.widget': 'Widget πίνακα',
   'admin.plugins.cap.heroWidget': 'Widget κάρτας επιβίβασης',
   'admin.plugins.cap.placeSlot': 'Λεπτομέρειες τόπου',
+  'admin.plugins.cap.daySlot': 'Λεπτομέρειες ημέρας',
+  'admin.plugins.cap.reservationSlot': 'Λεπτομέρειες κράτησης',
+  'admin.plugins.cap.replacesTabs': 'Αντικαθιστά καρτέλες του σχεδιαστή',
   'admin.plugins.cap.realtime': 'Ενημερώσεις σε πραγματικό χρόνο',
+  'admin.plugins.cap.notificationChannel': 'Κανάλι ειδοποιήσεων',
   'admin.plugins.cap.photos': 'Παρέχει φωτογραφίες',
   'admin.plugins.cap.calendar': 'Παρέχει συμβάντα ημερολογίου',
   'admin.plugins.cap.placeDetails': 'Εμπλουτίζει μέρη',
@@ -380,6 +502,10 @@ const admin: TranslationStrings = {
   'admin.plugins.dep.download': 'Λήψη',
   'admin.plugins.dep.update': 'Ενημέρωση',
   'admin.plugins.dep.resolveHint': 'Λαμβάνει την πιο πρόσφατη συμβατή έκδοση, μαζί με τις δικές της εξαρτήσεις.',
+  'admin.plugins.dep.trekIncompatible': 'Απαιτεί TREK {range} — αυτός ο διακομιστής εκτελεί {host}',
+  'admin.plugins.dep.trekUnknown': 'Δεν δηλώνει ποιες εκδόσεις TREK υποστηρίζει',
+  'admin.plugins.installCompatible': 'Εγκατάσταση {version}',
+  'admin.plugins.incompatible': 'Μη συμβατό',
   'admin.plugins.accessTitle': 'Σε τι έχει πρόσβαση',
   'admin.plugins.connectsTitle': 'Συνδέεται σε',
   'admin.plugins.detailsTitle': 'Λεπτομέρειες',
@@ -388,12 +514,13 @@ const admin: TranslationStrings = {
   'admin.plugins.metaSize': 'Μέγεθος',
   'admin.plugins.metaRequires': 'Απαιτεί',
   'admin.plugins.metaReviewed': 'Ελέγχθηκε στις',
+  'admin.plugins.downloads': 'Λήψεις',
   'admin.addons.title': 'Πρόσθετα',
   'admin.addons.subtitle':
     'Ενεργοποιήστε ή απενεργοποιήστε λειτουργίες για να εξατομικεύσετε την εμπειρία σας στο TREK.',
   'admin.addons.catalog.packing.name': 'Λίστες',
   'admin.addons.catalog.packing.description': 'Λίστες πακεταρίσματος και εργασίες προς εκτέλεση για τα ταξίδια σας',
-  'admin.addons.catalog.budget.name': 'Προϋπολογισμός',
+  'admin.addons.catalog.budget.name': 'Κόστη',
   'admin.addons.catalog.budget.description': 'Παρακολουθήστε τα έξοδα και σχεδιάστε τον προϋπολογισμό του ταξιδιού σας',
   'admin.addons.catalog.documents.name': 'Έγγραφα',
   'admin.addons.catalog.documents.description': 'Αποθηκεύστε και διαχειριστείτε ταξιδιωτικά έγγραφα',
