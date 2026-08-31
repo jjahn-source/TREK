@@ -2134,3 +2134,108 @@ describe('AdminPluginsPanel — update all', () => {
     await waitFor(() => expect(started).toEqual(['a-widget', 'b-widget']))
   })
 })
+
+/**
+ * Instance settings. Before this form existed a plugin declaring `scope:'instance'`
+ * settings could not be configured at all — the route was there, nothing called it.
+ *
+ * The behaviour worth pinning is what happens AFTER the save: a plugin child reads its
+ * settings once, at init, so a save that does not restart it silently changes nothing.
+ * The obvious endpoint for that (`/reload`) is dev-only and 403s on a normal install,
+ * which is exactly the kind of thing that looks fine in dev and fails for everyone else.
+ */
+describe('AdminPluginsPanel — instance settings', () => {
+  const withFields = () =>
+    server.use(
+      http.get('*/api/admin/plugins/trek-gotify/config', () =>
+        HttpResponse.json({
+          fields: [
+            { key: 'api_base', label: 'API base', input_type: 'text', required: true, secret: false },
+            { key: 'api_key', label: 'API key', input_type: 'text', required: true, secret: true },
+          ],
+          config: { api_base: 'https://api.example.com', api_key: '••••••••' },
+        }),
+      ),
+    )
+
+  const openSettings = async () => {
+    render(<AdminPluginsPanel />)
+    fireEvent.click(await screen.findByTestId('plugin-row-menu-btn-trek-gotify'))
+    const menu = screen.getByTestId('plugin-row-menu-trek-gotify')
+    fireEvent.click(within(menu).getByText(/^Settings$/))
+  }
+
+  it('FE-COMP-PLUGINS-CFG-001: renders the plugin’s declared instance fields with their stored values', async () => {
+    mockList(plugin())
+    withFields()
+    await openSettings()
+    expect(await screen.findByDisplayValue('https://api.example.com')).toBeInTheDocument()
+    // A secret is never echoed back in the clear.
+    expect(await screen.findByDisplayValue('••••••••')).toBeInTheDocument()
+  })
+
+  it('FE-COMP-PLUGINS-CFG-002: sends only the fields the admin actually edited', async () => {
+    mockList(plugin())
+    withFields()
+    let sent: unknown = null
+    server.use(
+      http.put('*/api/admin/plugins/trek-gotify/config', async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json({ config: {} })
+      }),
+      http.post('*/api/admin/plugins/trek-gotify/deactivate', () => HttpResponse.json({ status: 'inactive' })),
+      http.post('*/api/admin/plugins/trek-gotify/activate', () => HttpResponse.json({ status: 'active' })),
+    )
+    await openSettings()
+    const base = await screen.findByDisplayValue('https://api.example.com')
+    await userEvent.clear(base)
+    await userEvent.type(base, 'https://new.example.com')
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    // api_key was never touched, so it must NOT be sent — resending the mask would
+    // overwrite the stored secret with dots.
+    await waitFor(() => expect(sent).toEqual({ api_base: 'https://new.example.com' }))
+  })
+
+  it('FE-COMP-PLUGINS-CFG-003: restarts the plugin so the new settings take effect', async () => {
+    mockList(plugin({ status: 'active' }))
+    withFields()
+    const calls: string[] = []
+    server.use(
+      http.put('*/api/admin/plugins/trek-gotify/config', () => HttpResponse.json({ config: {} })),
+      http.post('*/api/admin/plugins/trek-gotify/reload', () => {
+        calls.push('reload')
+        // What a real install answers: the endpoint is dev-only.
+        return HttpResponse.json({ error: 'Dev-link is disabled' }, { status: 403 })
+      }),
+      http.post('*/api/admin/plugins/trek-gotify/deactivate', () => { calls.push('deactivate'); return HttpResponse.json({ status: 'inactive' }) }),
+      http.post('*/api/admin/plugins/trek-gotify/activate', () => { calls.push('activate'); return HttpResponse.json({ status: 'active' }) }),
+    )
+    await openSettings()
+    const base = await screen.findByDisplayValue('https://api.example.com')
+    await userEvent.clear(base)
+    await userEvent.type(base, 'https://new.example.com')
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(calls).toEqual(['deactivate', 'activate']))
+    // Never /reload: it 403s outside dev, so the settings would silently not apply.
+    expect(calls).not.toContain('reload')
+  })
+
+  it('FE-COMP-PLUGINS-CFG-004: leaves a disabled plugin disabled instead of switching it on', async () => {
+    mockList(plugin({ status: 'inactive', enabled: 0 }))
+    withFields()
+    const calls: string[] = []
+    server.use(
+      http.put('*/api/admin/plugins/trek-gotify/config', () => HttpResponse.json({ config: {} })),
+      http.post('*/api/admin/plugins/trek-gotify/activate', () => { calls.push('activate'); return HttpResponse.json({ status: 'active' }) }),
+      http.post('*/api/admin/plugins/trek-gotify/deactivate', () => { calls.push('deactivate'); return HttpResponse.json({ status: 'inactive' }) }),
+    )
+    await openSettings()
+    const base = await screen.findByDisplayValue('https://api.example.com')
+    await userEvent.clear(base)
+    await userEvent.type(base, 'https://new.example.com')
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument())
+    // An admin who turned this plugin off must not find it running again.
+    expect(calls).toEqual([])
+  })
+})

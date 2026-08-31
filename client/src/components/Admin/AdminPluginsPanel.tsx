@@ -579,9 +579,21 @@ export default function AdminPluginsPanel() {
       const patch: Record<string, string> = {}
       for (const k of Object.keys(settingsFor.dirty)) patch[k] = settingsFor.values[k] ?? ''
       await adminApi.pluginSetConfig(settingsFor.id, patch)
-      // Re-spawn so the plugin picks the new config up: its runtime reads settings at
-      // init, exactly like the egress list.
-      await adminApi.pluginReload(settingsFor.id).catch(() => {})
+      // Re-spawn so the plugin picks the new config up: a child reads its settings once,
+      // at init, so a save that does not restart it appears to work and changes nothing.
+      //
+      // Deliberately NOT pluginReload — that endpoint is dev-only (it 403s unless
+      // TREK_PLUGINS_DEV_LINK is set), so on a normal install it would fail silently and
+      // leave the plugin on its old config. Deactivate+activate is what the row's own
+      // Restart does, and it works everywhere.
+      //
+      // Only cycle a plugin that is actually running: activating one the admin had
+      // deliberately turned off would silently switch it back on.
+      const wasActive = plugins.some(p => p.id === settingsFor.id && p.status === 'active')
+      if (wasActive) {
+        await adminApi.pluginDeactivate(settingsFor.id)
+        await adminApi.pluginActivate(settingsFor.id)
+      }
       setSettingsFor(null)
       refresh()
     } catch (e) {
