@@ -32,7 +32,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Map Template',
   'settings.mapTemplatePlaceholder.select': 'Select template...',
   'settings.mapDefaultHint': 'Leave empty for OpenStreetMap (default)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'URL template for map tiles',
   'settings.mapProvider': 'Map Provider',
   'settings.mapProviderHint': 'Affects Trip Planner and Journey maps. Atlas always uses Leaflet.',
@@ -43,6 +42,11 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox Access Token',
   'settings.mapMapboxTokenHint': 'Public token (pk.*) from',
   'settings.mapMapboxTokenLink': 'mapbox.com → Access tokens',
+  'settings.mapCartoKey': 'CARTO API key',
+  'settings.mapCartoKeyHint': 'CARTO basemaps show a watermark without a key. Free, no account needed, from',
+  'settings.mapCartoKeyLink': 'carto.com basemap API key',
+  'settings.mapCartoKeyMissing':
+    'This template is a CARTO basemap. Without a key CARTO stamps "API KEY REQUIRED" onto every tile. Until you enter one, TREK shows the default basemap instead.',
   'settings.mapStyle': 'Map Style',
   'settings.mapStylePlaceholder': 'Select a Mapbox style',
   'settings.mapStyleHint': 'Preset or your own mapbox://styles/USER/ID URL',
@@ -91,6 +95,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Trip reminders',
   'settings.notifyTodoDue': 'Todo due soon',
   'settings.notifyVacayInvite': 'Vacay fusion invitations',
+  'settings.notifyVacayShare': 'Vacay calendar shares',
   'settings.notifyPhotosShared': 'Shared photos (Immich)',
   'settings.notifyCollabMessage': 'Chat messages (Collab)',
   'settings.notifyPackingTagged': 'Packing list: assignments',
@@ -227,6 +232,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Feature Request',
   'settings.about.featureRequestHint': 'Suggest a new feature',
   'settings.about.wikiHint': 'Documentation & guides',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Monthly Supporters',
   'settings.about.supporters.title': 'Travel companions for TREK',
   'settings.about.supporters.subtitle':
@@ -279,6 +288,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Profile picture updated',
   'settings.avatarRemoved': 'Profile picture removed',
   'settings.avatarError': 'Upload failed',
+  'settings.avatarRemoveError': 'Removal failed',
   'settings.mfa.title': 'Two-factor authentication (2FA)',
   'settings.mfa.description':
     'Adds a second step when you sign in with email and password. Use an authenticator app (Google Authenticator, Authy, etc.).',
@@ -305,8 +315,9 @@ const settings: TranslationStrings = {
   'settings.mfa.toastEnabled': 'Two-factor authentication enabled',
   'settings.mfa.toastDisabled': 'Two-factor authentication disabled',
   'settings.mfa.demoBlocked': 'Not available in demo mode',
-  'settings.currency': 'Currency',
-  'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currency': 'Display currency',
+  'settings.currencyHint':
+    'Amounts in Costs are shown converted to this currency for display only — the original amounts are unchanged.',
   'settings.currencyTrip': 'Trip currency',
   'settings.passkey.title': 'Passkeys',
   'settings.passkey.description':
@@ -332,7 +343,7 @@ const settings: TranslationStrings = {
   'settings.passkey.neverUsed': 'Never used',
   'settings.airtrail.title': 'AirTrail',
   'settings.airtrail.hint':
-    'Connect your self-hosted AirTrail to import and sync flights. Create an API key in AirTrail under Settings → Security.',
+    'Connect your AirTrail instance to import and sync flights. Create an API key in AirTrail under Settings → Security.',
   'settings.airtrail.url': 'Instance URL',
   'settings.airtrail.apiKey': 'API key',
   'settings.airtrail.apiKeyPlaceholder': 'Bearer API key',
@@ -351,11 +362,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Connection failed',
   'settings.aiParsing.title': 'AI parsing',
   'settings.aiParsing.hint':
-    'Use your own AI model to extract bookings from uploaded files. This applies only when your administrator has not configured a model for the whole instance.',
+    'Choose the AI model used to extract bookings from uploaded files. This applies only when your administrator has not configured a model for the whole instance.',
   'settings.aiParsing.provider': 'Provider',
   'settings.aiParsing.providerLocal': 'Local (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'A local (Ollama) endpoint is set up once for the whole instance in the admin settings. You can still use your own OpenAI or Anthropic key here.',
   'settings.aiParsing.model': 'Model',
   'settings.aiParsing.baseUrl': 'Base URL',
   'settings.aiParsing.baseUrlHint': 'Where the model runs — a local Ollama server or an OpenAI-compatible endpoint.',
@@ -429,8 +442,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Bottom navbar',
+  'settings.appearance.mobileNav.hint':
+    'Choose which items appear in the bar and which sit under “More”. Dashboard always stays first.',
+  'settings.appearance.mobileNav.inBar': 'In the bar',
+  'settings.appearance.mobileNav.underMore': 'Under “More”',
+  'settings.appearance.mobileNav.moreEmpty': 'Nothing here yet — everything fits in the bar.',
+  'settings.appearance.mobileNav.pinned': 'Pinned',
+  'settings.appearance.mobileNav.toMore': 'Move under “More”',
+  'settings.appearance.mobileNav.toBar': 'Move into the bar',
+  'settings.appearance.dashOrder': 'Dashboard order',
+  'settings.appearance.dashOrder.hint':
+    'Reorder how the trip list and widgets stack on your phone dashboard. The featured trip always stays on top.',
+  'settings.appearance.dashOrder.trips': 'Trips',
+  'settings.appearance.dashOrder.hidden': 'Hidden',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': 'Startup',
+  'settings.startPage': 'Start page',
+  'settings.startPageDashboard': 'Dashboard',
+  'settings.startPageActiveTrip': 'Active trip',
+  'settings.startPageHint':
+    'TREK opens straight in the trip running today, or the next one coming up. That is the same trip the dashboard features.',
+  'settings.startTripTab': 'Start tab',
+  'settings.startTripTabHint':
+    'The tab the trip opens on. If it belongs to an addon you switched off, the plan view opens instead.',
 
   // ── Offline (#1135) ────────────────────────────────────────────────────────
   'settings.offline.cache.title': 'Offline cache',
@@ -484,7 +520,32 @@ const settings: TranslationStrings = {
   'settings.offline.banner.failed': 'Failed to sync: {count}',
   'settings.offline.banner.conflicts': 'Conflicts: {count}',
   'settings.alwaysShowRoutes': 'Always show booking routes',
-  'settings.alwaysShowRoutesHint': 'Automatically draw the route for every flight, train and other booking on the map — no need to switch it on per item.',
+  'settings.alwaysShowRoutesHint':
+    'Automatically draw the route for every flight, train and other booking on the map — no need to switch it on per item.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'API Keys',
+  'settings.apiKeys.description': 'Keys for the public API, so other software can read your trips. Read-only: a key cannot change or delete anything.',
+  'settings.apiKeys.create': 'Create key',
+  'settings.apiKeys.empty': 'No keys yet. Create one to connect other software.',
+  'settings.apiKeys.createdAt': 'created',
+  'settings.apiKeys.usedAt': 'last used',
+  'settings.apiKeys.deleteTitle': 'Delete key',
+  'settings.apiKeys.deleteMessage': 'Anything using this key stops working immediately. This cannot be undone.',
+  'settings.apiKeys.deleted': 'Key deleted',
+  'settings.apiKeys.deleteFailed': 'Could not delete the key',
+  'settings.apiKeys.createFailed': 'Could not create the key',
+  'settings.apiKeys.copy': 'Copy',
+  'settings.apiKeys.docsHint': 'Send the key as "Authorization: Bearer ..." or "X-API-Key: ..." to /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Create API key',
+  'settings.apiKeys.modal.name': 'Name',
+  'settings.apiKeys.modal.namePlaceholder': 'e.g. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Only for you, so you recognise the key later.',
+  'settings.apiKeys.modal.creating': 'Creating...',
+  'settings.apiKeys.modal.create': 'Create',
+  'settings.apiKeys.modal.createdTitle': 'API key created',
+  'settings.apiKeys.modal.createdWarning': 'Copy the key now. It is shown once and cannot be retrieved later.',
+  'settings.apiKeys.modal.done': 'Done',
 };
 
 export default settings;

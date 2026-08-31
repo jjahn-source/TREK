@@ -42,23 +42,92 @@ const { isAddonEnabledMock } = vi.hoisted(() => {
   const isAddonEnabledMock = vi.fn().mockReturnValue(true);
   return { isAddonEnabledMock };
 });
-vi.mock('../../../src/services/adminService', () => ({
+// Was a module mock over addons.bridge. The `when:` gates read the controller's
+// injected AddonsService now, so the toggle goes in through the constructor —
+// which is the point of the change: the dependency is in the signature instead
+// of behind an import path.
+const addonsStub = {
   isAddonEnabled: isAddonEnabledMock,
-  getCollabFeatures: vi.fn().mockReturnValue({ chat: true, notes: true, polls: true, whatsnext: true }),
-}));
+  getCollabFeatures: () => ({ chat: true, notes: true, polls: true, whatsnext: true }),
+} as unknown as AddonsService;
 
 const { mockGetTripSummary } = vi.hoisted(() => ({
   mockGetTripSummary: vi.fn(),
 }));
-vi.mock('../../../src/services/tripService', () => ({
-  getTripSummary: mockGetTripSummary,
-}));
+// The prompts read the summary through the injected read model (readModelStub
+// below wraps the same controllable mock) — trips.bridge is deleted.
 
 import { createTables } from '../../../src/db/schema';
 import { runMigrations } from '../../../src/db/migrations';
 import { resetTestDb } from '../../helpers/test-db';
 import { createUser, createTrip, addTripMember, createPackingItem, createBudgetItem } from '../../helpers/factories';
-import { registerMcpPrompts } from '../../../src/mcp/tools/prompts';
+import { createTestRegistry } from '../../../src/nest-mcp';
+import { trekMcpAccessPolicy, trekMcpValidateAccess } from '../../../src/mcp/nest-mcp-policy';
+import { TripsMcp } from '../../../src/nest/trips/trips.mcp';
+import { TripPromptsMcp } from '../../../src/nest/trips/trip-prompts.mcp';
+import { TripMembershipService } from '../../../src/nest/trip-membership/trip-membership.service';
+import { PackingMcp } from '../../../src/nest/packing/packing.mcp';
+import { PackingService } from '../../../src/nest/packing/packing.service';
+import { BudgetMcp } from '../../../src/nest/budget/budget.mcp';
+import { BudgetService } from '../../../src/nest/budget/budget.service';
+import { RuntimeEnvService } from '../../../src/nest/app-config/runtime-env.service';
+import { ExchangeRatesService } from '../../../src/nest/budget/exchange-rates.service';
+import { AuthMcp } from '../../../src/nest/auth/auth.mcp';
+import { DatabaseService } from '../../../src/nest/database/database.service';
+import { PermissionsService } from '../../../src/nest/permissions/permissions.service';
+import { RealtimeService } from '../../../src/nest/realtime/realtime.service';
+import { McpToolGuardsService } from '../../../src/nest/mcp-shared/mcp-tool-guards.service';
+import type { AuthService } from '../../../src/nest/auth/auth.service';
+import type { TripsService } from '../../../src/nest/trips/trips.service';
+import type { TodoService } from '../../../src/nest/todo/todo.service';
+import type { CollabService } from '../../../src/nest/collab/collab.service';
+import { AddonsService } from '../../../src/nest/addons/addons.service';
+import { notificationsStub } from '../../helpers/notifications';
+
+// The trip-summary prompt moved to the DI-discovered TripsMcp — its cases below
+// exercise it through a hand-built registry over a stub TripsService whose
+// getTripSummary is the same controllable mock the legacy path used.
+const tripsStub = {
+  canAccessTrip: (tripId: number, userId: number) => dbMock.canAccessTrip(tripId, userId),
+} as unknown as TripsService;
+// getTripSummary moved to TripReadModelService with the trip split; the mock is
+// the same controllable one, one constructor slot further along.
+const readModelStub = {
+  getTripSummary: (tripId: number, viewerUserId?: number) => mockGetTripSummary(tripId, viewerUserId),
+} as never;
+const promptGuards = new McpToolGuardsService(new DatabaseService(testDb), new PermissionsService(new DatabaseService(testDb)), new RealtimeService());
+const tripsMcp = new TripsMcp(
+  tripsStub,
+  { listItems: () => [] } as unknown as TodoService,
+  { listPolls: () => [], countMessages: () => 0 } as unknown as CollabService,
+  undefined as never,
+  undefined as never,
+  undefined as never,
+  readModelStub,
+  addonsStub,
+  promptGuards,
+);
+
+// The three remaining prompts moved to their domains' @McpController classes:
+// packing-list, budget-overview and the static-token notice. Built over the same
+// in-memory DB so the cases below keep asserting real rows.
+const promptDbs = () => new DatabaseService(testDb);
+const authStub = { isDemoUser: () => false } as unknown as AuthService;
+const promptPackingService = new PackingService(promptDbs(), new PermissionsService(promptDbs()), new RealtimeService(), notificationsStub());
+const packingMcp = new PackingMcp(promptPackingService, authStub, addonsStub, promptGuards);
+const budgetMcp = new BudgetMcp(
+  new BudgetService(promptDbs(), new PermissionsService(promptDbs()), new ExchangeRatesService(), new RealtimeService()),
+  new ExchangeRatesService(),
+  promptDbs(),
+  new RuntimeEnvService(),
+  new TripMembershipService(promptDbs()),
+  addonsStub,
+  promptGuards,
+);
+// The packing-list / budget-overview prompts live here since the trips.bridge
+// fold; the summary rides the same readModelStub the trip-summary prompt uses.
+const tripPromptsMcp = new TripPromptsMcp(tripsStub, readModelStub, promptPackingService, addonsStub);
+const authMcp = new AuthMcp();
 
 beforeAll(() => {
   createTables(testDb);
@@ -109,7 +178,10 @@ afterAll(() => {
 /** Build a fresh McpServer with prompts registered for the given userId. */
 function buildServer(userId: number, opts: { isStaticToken?: boolean } = {}): McpServer {
   const server = new McpServer({ name: 'trek-test', version: '1.0.0' });
-  registerMcpPrompts(server, userId, opts.isStaticToken ?? false);
+  // Every prompt is DI-discovered now; attach them the way registerTools does in
+  // production, including the isStaticToken flag the notice's `when` gate reads.
+  createTestRegistry([tripsMcp, tripPromptsMcp, packingMcp, budgetMcp, authMcp], { accessPolicy: trekMcpAccessPolicy, validateAccess: trekMcpValidateAccess })
+    .attach(server, { userId, scopes: null, isStaticToken: opts.isStaticToken ?? false });
   return server;
 }
 

@@ -23,7 +23,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': '지도 템플릿',
   'settings.mapTemplatePlaceholder.select': '템플릿 선택...',
   'settings.mapDefaultHint': '비워두면 OpenStreetMap (기본값) 사용',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': '지도 타일 URL 템플릿',
   'settings.mapProvider': '지도 공급자',
   'settings.mapProviderHint': '여행 플래너 및 Journey 지도에 영향을 줍니다. Atlas는 항상 Leaflet을 사용합니다.',
@@ -34,6 +33,12 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox 액세스 토큰',
   'settings.mapMapboxTokenHint': '공개 토큰 (pk.*) 출처',
   'settings.mapMapboxTokenLink': 'mapbox.com → 액세스 토큰',
+  'settings.mapCartoKey': 'CARTO API 키',
+  'settings.mapCartoKeyHint':
+    'CARTO 배경 지도는 키가 없으면 워터마크가 표시됩니다. 무료이며 계정도 필요 없습니다. 출처',
+  'settings.mapCartoKeyLink': 'carto.com 배경 지도 API 키',
+  'settings.mapCartoKeyMissing':
+    '이 템플릿은 CARTO 배경 지도입니다. 키가 없으면 CARTO가 모든 타일에 "API KEY REQUIRED"를 새깁니다. 키를 입력하기 전까지 TREK은 기본 배경 지도를 표시합니다.',
   'settings.mapStyle': '지도 스타일',
   'settings.mapStylePlaceholder': 'Mapbox 스타일 선택',
   'settings.mapStyleHint': '프리셋 또는 mapbox://styles/USER/ID URL 직접 입력',
@@ -79,6 +84,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': '여행 리마인더',
   'settings.notifyTodoDue': '할 일 마감 임박',
   'settings.notifyVacayInvite': 'Vacay 퓨전 초대',
+  'settings.notifyVacayShare': 'Vacay 캘린더 공유',
   'settings.notifyPhotosShared': '공유된 사진 (Immich)',
   'settings.notifyCollabMessage': '채팅 메시지 (Collab)',
   'settings.notifyPackingTagged': '짐 목록: 배정',
@@ -209,6 +215,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': '기능 요청',
   'settings.about.featureRequestHint': '새로운 기능을 제안하세요',
   'settings.about.wikiHint': '문서 및 가이드',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': '월간 후원자',
   'settings.about.supporters.title': 'TREK의 여행 동반자',
   'settings.about.supporters.subtitle':
@@ -258,6 +268,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': '프로필 사진이 업데이트되었습니다',
   'settings.avatarRemoved': '프로필 사진이 삭제되었습니다',
   'settings.avatarError': '업로드 실패',
+  'settings.avatarRemoveError': '삭제 실패',
   'settings.mfa.title': '2단계 인증 (2FA)',
   'settings.mfa.description':
     '이메일 및 비밀번호로 로그인할 때 두 번째 단계를 추가합니다. 인증 앱 (Google Authenticator, Authy 등)을 사용하세요.',
@@ -290,8 +301,8 @@ const settings: TranslationStrings = {
   'settings.oauth.modal.machineClientUsage':
     '토큰 받기: grant_type=client_credentials, client_id, client_secret으로 POST /oauth/token을 호출하세요. 브라우저도 새로 고침 토큰도 필요 없습니다.',
   'settings.oauth.badge.machine': '머신',
-  'settings.currency': 'Currency',
-  'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currency': '표시 통화',
+  'settings.currencyHint': '비용의 금액은 표시 목적으로만 이 통화로 환산되어 표시되며, 원래 금액은 변경되지 않습니다.',
   'settings.currencyTrip': '여행 통화',
   'settings.passkey.title': '패스키',
   'settings.passkey.description':
@@ -338,11 +349,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': '연결에 실패했습니다',
   'settings.aiParsing.title': 'AI 분석',
   'settings.aiParsing.hint':
-    '업로드한 파일에서 예약 정보를 추출할 때 직접 지정한 AI 모델을 사용하세요. 이 설정은 관리자가 인스턴스 전체에 모델을 설정하지 않은 경우에만 적용됩니다.',
+    '업로드한 파일에서 예약 정보를 추출할 AI 모델을 선택하세요. 이 설정은 관리자가 인스턴스 전체에 모델을 설정하지 않은 경우에만 적용됩니다.',
   'settings.aiParsing.provider': '제공자',
   'settings.aiParsing.providerLocal': '로컬 (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    '로컬 (Ollama) 엔드포인트는 관리자 설정에서 인스턴스 전체에 대해 한 번만 설정합니다. 본인의 OpenAI 또는 Anthropic 키는 여기서 계속 사용할 수 있습니다.',
   'settings.aiParsing.model': '모델',
   'settings.aiParsing.baseUrl': '기본 URL',
   'settings.aiParsing.baseUrlHint': '모델이 실행되는 위치 — 로컬 Ollama 서버 또는 OpenAI 호환 엔드포인트입니다.',
@@ -416,8 +429,30 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': '하단 내비게이션 바',
+  'settings.appearance.mobileNav.hint':
+    '바에 표시할 항목과 「더보기」에 넣을 항목을 선택하세요. 대시보드는 항상 맨 앞에 고정됩니다.',
+  'settings.appearance.mobileNav.inBar': '바에 표시',
+  'settings.appearance.mobileNav.underMore': '「더보기」에 표시',
+  'settings.appearance.mobileNav.moreEmpty': '아직 비어 있습니다 — 모든 항목이 바에 들어갑니다.',
+  'settings.appearance.mobileNav.pinned': '고정됨',
+  'settings.appearance.mobileNav.toMore': '「더보기」에 넣기',
+  'settings.appearance.mobileNav.toBar': '바에 넣기',
+  'settings.appearance.dashOrder': '대시보드 순서',
+  'settings.appearance.dashOrder.hint':
+    '휴대폰 대시보드에서 여행 목록과 위젯이 표시되는 순서를 조정하세요. 대표 여행은 항상 맨 위에 고정됩니다.',
+  'settings.appearance.dashOrder.trips': '여행',
+  'settings.appearance.dashOrder.hidden': '숨김',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': '시작',
+  'settings.startPage': '시작 화면',
+  'settings.startPageDashboard': '대시보드',
+  'settings.startPageActiveTrip': '진행 중인 여행',
+  'settings.startPageHint':
+    'TREK을 열면 지금 진행 중인 여행, 없으면 다음에 시작하는 여행으로 바로 이동합니다. 대시보드가 강조하는 여행과 같습니다.',
+  'settings.startTripTab': '시작 탭',
+  'settings.startTripTabHint': '여행이 열릴 탭입니다. 꺼 둔 애드온의 탭이면 대신 계획이 열립니다.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': '오프라인 캐시',
@@ -482,7 +517,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': '시간',
   'settings.pluginActivity.columns.status': '결과',
   'settings.alwaysShowRoutes': '예약 경로 항상 표시',
-  'settings.alwaysShowRoutesHint': '항공편, 기차 등 모든 예약의 경로를 개별적으로 켤 필요 없이 지도에 자동으로 표시합니다.',
+  'settings.alwaysShowRoutesHint':
+    '항공편, 기차 등 모든 예약의 경로를 개별적으로 켤 필요 없이 지도에 자동으로 표시합니다.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'API 키',
+  'settings.apiKeys.description': '공개 API용 키입니다. 다른 소프트웨어가 여행을 읽을 수 있습니다. 읽기 전용이라 무엇도 바꾸거나 지울 수 없습니다.',
+  'settings.apiKeys.create': '키 만들기',
+  'settings.apiKeys.empty': '아직 키가 없습니다. 다른 소프트웨어를 연결하려면 하나 만드세요.',
+  'settings.apiKeys.createdAt': '생성일',
+  'settings.apiKeys.usedAt': '마지막 사용',
+  'settings.apiKeys.deleteTitle': '키 삭제',
+  'settings.apiKeys.deleteMessage': '이 키를 쓰는 모든 것이 즉시 작동을 멈춥니다. 되돌릴 수 없습니다.',
+  'settings.apiKeys.deleted': '키를 삭제했습니다',
+  'settings.apiKeys.deleteFailed': '키를 삭제하지 못했습니다',
+  'settings.apiKeys.createFailed': '키를 만들지 못했습니다',
+  'settings.apiKeys.copy': '복사',
+  'settings.apiKeys.docsHint': '키를 "Authorization: Bearer ..." 또는 "X-API-Key: ..." 로 /api/v1 에 보내세요.',
+  'settings.apiKeys.modal.createTitle': 'API 키 만들기',
+  'settings.apiKeys.modal.name': '이름',
+  'settings.apiKeys.modal.namePlaceholder': '예: Dawarich',
+  'settings.apiKeys.modal.nameHint': '나중에 키를 알아보기 위한, 본인용 이름입니다.',
+  'settings.apiKeys.modal.creating': '만드는 중...',
+  'settings.apiKeys.modal.create': '만들기',
+  'settings.apiKeys.modal.createdTitle': 'API 키를 만들었습니다',
+  'settings.apiKeys.modal.createdWarning': '지금 키를 복사하세요. 한 번만 표시되며 나중에 다시 확인할 수 없습니다.',
+  'settings.apiKeys.modal.done': '완료',
 };
 
 export default settings;

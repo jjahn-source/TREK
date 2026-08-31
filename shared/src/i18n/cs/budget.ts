@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Smazat výdaj?',
+  'costs.confirm.deleteBody': '„{name}“ bude trvale smazáno.',
   'budget.title': 'Rozpočet',
   'budget.exportCsv': 'Exportovat CSV',
   'budget.emptyTitle': 'Zatím nebyl vytvořen žádný rozpočet',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Vrátit zpět',
   'costs.whatFor': 'Za co to bylo?',
   'costs.namePlaceholder': 'např. večeře, suvenýry, benzín…',
+  'costs.note': 'Poznámka',
+  'costs.notePlaceholder': 'Co zahrnovalo, kdo co dluží…',
+  'costs.addNote': 'Přidat poznámku',
+  'costs.showNote': 'Zobrazit poznámku',
+  'costs.hideNote': 'Skrýt poznámku',
   'costs.totalAmount': 'Celková částka',
   'costs.currency': 'Měna',
   'costs.day': 'Den',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Poplatky a vstupenky',
   'costs.cat.health': 'Zdraví',
   'costs.cat.tips': 'Spropitné',
+  'costs.cat.fuel': 'Palivo',
+  'costs.cat.parking': 'Parkování',
   'costs.cat.other': 'Ostatní',
   'costs.daysCount': '{count} dní',
   'costs.travelers': '{count} cestovatelů',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Všechny kategorie',
   'costs.filter.allDays': 'Všechny dny',
   'costs.expensesCount': '{count} výdajů',
+  'costs.ticketItemName': 'Název položky',
+  'costs.ticketSplitting': 'Dělí se mezi:',
+  'costs.ticketAddItem': 'Přidat položku',
+  'costs.ticketShares': 'Podíl každého',
+  'costs.excluded': 'Nezahrnuto',
+  'costs.splitBalanced': 'Rozdělení sedí s celkem',
+  'costs.splitSumUnder': 'Součet podílů: {sum} z {total} (chybí {diff})',
+  'costs.splitSumOver': 'Součet podílů: {sum} z {total} (o {diff} více)',
 };
 export default budget;

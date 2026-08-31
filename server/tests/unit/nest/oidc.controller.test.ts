@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 
 import { OidcController } from '../../../src/nest/oidc/oidc.controller';
+import { OIDC_STATE_TTL_MS } from '../../../src/nest/oidc/oidc.service';
 import type { OidcService } from '../../../src/nest/oidc/oidc.service';
 
 function svc(o: Partial<OidcService> = {}): OidcService {
@@ -72,6 +73,12 @@ describe('OidcController /login', () => {
     expect(res.redirectedTo).toContain('code_challenge_method=S256');
   });
 
+  it('binds the state cookie with a maxAge matching the server-side state TTL', async () => {
+    const res = makeRes();
+    await new OidcController(svc()).login(req, res);
+    expect(res.cookie).toHaveBeenCalledWith('trek_oidc_state', 'st', expect.objectContaining({ maxAge: OIDC_STATE_TTL_MS }));
+  });
+
   it('400 when a non-HTTPS issuer is used in production', async () => {
     process.env.NODE_ENV = 'production';
     const res = makeRes();
@@ -99,14 +106,36 @@ describe('OidcController /login', () => {
     const createState = vi.fn().mockReturnValue({ state: 'st', codeChallenge: 'cc' });
     const reqInvite = { query: { invite: 'tok123' }, headers: {} } as unknown as Request;
     await new OidcController(svc({ createState })).login(reqInvite, res);
-    expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', 'tok123');
+    expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', 'tok123', undefined);
+  });
+
+  it('threads remember=1 / remember=0 / absent into createState as true / false / undefined', async () => {
+    for (const [query, expected] of [
+      [{ remember: '1' }, true],
+      [{ remember: '0' }, false],
+      [{}, undefined],
+    ] as const) {
+      const createState = vi.fn().mockReturnValue({ state: 'st', codeChallenge: 'cc' });
+      const r = makeRes();
+      await new OidcController(svc({ createState })).login({ query, headers: {} } as unknown as Request, r);
+      expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', undefined, expected);
+    }
+  });
+
+  it('a malformed remember value never blocks the redirect and falls back to the default duration', async () => {
+    const createState = vi.fn().mockReturnValue({ state: 'st', codeChallenge: 'cc' });
+    const res = makeRes();
+    const reqBad = { query: { invite: 'tok123', remember: 'yes' }, headers: {} } as unknown as Request;
+    await new OidcController(svc({ createState })).login(reqBad, res);
+    expect(res.redirect).toHaveBeenCalled();
+    expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', 'tok123', undefined);
   });
 
   it('trims a trailing slash off APP_URL when building the redirect uri', async () => {
     const res = makeRes();
     const createState = vi.fn().mockReturnValue({ state: 'st', codeChallenge: 'cc' });
     await new OidcController(svc({ getAppUrl: vi.fn().mockReturnValue('https://app///'), createState })).login(req, res);
-    expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', undefined);
+    expect(createState).toHaveBeenCalledWith('https://app/api/auth/oidc/callback', undefined, undefined);
   });
 
   it('500 when discovery throws', async () => {
@@ -323,6 +352,29 @@ describe('OidcController /callback', () => {
     await new OidcController(svc({ discover: vi.fn().mockRejectedValue(new Error('network down')) })).callback('c', 's', undefined, reqCb('s'), res);
     expect(res.redirectedTo).toBe('https://app/login?oidc_error=server_error');
   });
+
+  it('threads the pending remember flag into generateToken and createAuthCode', async () => {
+    for (const [remember, expectedGenerate] of [
+      [true, true],
+      [false, false],
+      [undefined, false],
+    ] as const) {
+      const generateToken = vi.fn().mockReturnValue('jwt');
+      const createAuthCode = vi.fn().mockReturnValue('ac');
+      const res = makeRes();
+      await new OidcController(svc({
+        consumeState: vi.fn().mockReturnValue({ redirectUri: 'https://app/api/auth/oidc/callback', codeVerifier: 'cv', inviteToken: undefined, remember }),
+        exchangeCodeForToken: vi.fn().mockResolvedValue({ _ok: true, access_token: 'at', id_token: 'it' }),
+        verifyIdToken: vi.fn().mockResolvedValue({ ok: true, claims: { sub: 'u1' } }),
+        getUserInfo: vi.fn().mockResolvedValue({ email: 'a@b.c', sub: 'u1' }),
+        findOrCreateUser: vi.fn().mockReturnValue({ user: { id: 1 } }),
+        generateToken,
+        createAuthCode,
+      })).callback('c', 's', undefined, reqCb('s'), res);
+      expect(generateToken).toHaveBeenCalledWith({ id: 1 }, expectedGenerate);
+      expect(createAuthCode).toHaveBeenCalledWith('jwt', remember);
+    }
+  });
 });
 
 describe('OidcController /exchange', () => {
@@ -340,7 +392,17 @@ describe('OidcController /exchange', () => {
     const r3 = makeRes();
     const setAuthCookie = vi.fn();
     new OidcController(svc({ consumeAuthCode: vi.fn().mockReturnValue({ token: 'jwt' }), setAuthCookie })).exchange('x', req, r3);
-    expect(setAuthCookie).toHaveBeenCalledWith(r3, 'jwt', req);
+    expect(setAuthCookie).toHaveBeenCalledWith(r3, 'jwt', req, undefined);
     expect(r3.body).toEqual({ token: 'jwt' });
+  });
+
+  it('forwards the stored remember flag to setAuthCookie', () => {
+    for (const remember of [true, false] as const) {
+      const res = makeRes();
+      const setAuthCookie = vi.fn();
+      new OidcController(svc({ consumeAuthCode: vi.fn().mockReturnValue({ token: 'jwt', remember }), setAuthCookie })).exchange('x', req, res);
+      expect(setAuthCookie).toHaveBeenCalledWith(res, 'jwt', req, remember);
+      expect(res.body).toEqual({ token: 'jwt' });
+    }
   });
 });

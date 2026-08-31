@@ -1,13 +1,17 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router'
 import { useJourneyStore } from '../../store/journeyStore'
 import { useTranslation } from '../../i18n'
 import { addListener, removeListener } from '../../api/websocket'
+import { journeyApi } from '../../api/client'
+import type { JourneyTrack } from '@trek/shared'
 import { DAY_COLORS } from '../../components/Journey/dayColors'
 import type { JourneyMapAutoHandle as JourneyMapHandle } from '../../components/Journey/JourneyMapAuto'
 import { useToast } from '../../components/shared/Toast'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { lockBodyScroll } from '../../utils/bodyScrollLock'
 import type { JourneyEntry } from '../../store/journeyStore'
+import { createDraftJourneyEntry } from './JourneyDetailPage.helpers'
 
 /**
  * Journey detail page logic — owns the journey load + WebSocket live sync, the
@@ -25,6 +29,8 @@ export function useJourneyDetail() {
   const { current, loading, notFound, loadJourney, updateEntry, deleteEntry, reorderEntries, uploadPhotos, deletePhoto } = useJourneyStore()
   const mapRef = useRef<JourneyMapHandle>(null)
   const fullMapRef = useRef<JourneyMapHandle>(null)
+  /** The gallery hands its file picker up here, so the hero button can open it. */
+  const galleryUploadRef = useRef<(() => void) | null>(null)
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null)
 
   const isMobile = useIsMobile()
@@ -48,8 +54,7 @@ export function useJourneyDetail() {
   // The bottom-nav "+" starts a new entry via ?create=entry.
   useEffect(() => {
     if (searchParams.get('create') === 'entry' && current && canEditEntries) {
-      const today = new Date().toISOString().slice(0, 10)
-      setEditingEntry({ id: 0, journey_id: current.id, author_id: 0, type: 'entry', entry_date: today, visibility: 'private', sort_order: 0, photos: [], created_at: 0, updated_at: 0 } as JourneyEntry)
+      setEditingEntry(createDraftJourneyEntry(current.id))
       setSearchParams(p => { p.delete('create'); return p }, { replace: true })
     }
   }, [searchParams, current, canEditEntries])
@@ -59,6 +64,19 @@ export function useJourneyDetail() {
 
   useEffect(() => {
     if (id) loadJourney(Number(id)).catch(() => {})
+  }, [id])
+
+  // GPX tracks of the trips behind this journey (#1260). Loaded separately from the
+  // journey itself: a journey without tracks is the common case, and a failed lookup
+  // should cost the map its lines, not the whole page.
+  const [tracks, setTracks] = useState<JourneyTrack[]>([])
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    journeyApi.listTracks(Number(id))
+      .then(res => { if (!cancelled) setTracks(res.tracks ?? []) })
+      .catch(() => { if (!cancelled) setTracks([]) })
+    return () => { cancelled = true }
   }, [id])
 
   useEffect(() => {
@@ -171,6 +189,58 @@ export function useJourneyDetail() {
     return () => scrollCleanupRef.current?.()
   }, [current?.entries, setupScrollSync])
 
+  // ── Jump to top / to the last entry (#1088) ───────────────────────────────
+  // A long journal is a long scroll: everything that adds to it — the entry
+  // button, the gallery upload — sits at the top, and where you were reading
+  // sits at the bottom. Two buttons beat two trips of the scroll wheel.
+  const [feedEdge, setFeedEdge] = useState<{ atTop: boolean; atBottom: boolean }>({ atTop: true, atBottom: true })
+
+  useEffect(() => {
+    const feed = feedRef.current
+    if (!feed) return
+    // 400px of travel before either button is worth offering; below that the
+    // scroll is short enough that a button is just clutter.
+    const THRESHOLD = 400
+    let frame: number | null = null
+    let pending = false
+    const measure = () => {
+      pending = false
+      const el = feedRef.current
+      if (!el) return
+      const scrolled = el.scrollTop
+      const remaining = el.scrollHeight - el.clientHeight - scrolled
+      setFeedEdge(prev => {
+        const next = { atTop: scrolled <= THRESHOLD, atBottom: remaining <= THRESHOLD }
+        return prev.atTop === next.atTop && prev.atBottom === next.atBottom ? prev : next
+      })
+    }
+    // The "already scheduled" flag is its own variable rather than the frame id:
+    // the id is only assigned once requestAnimationFrame returns, which is after
+    // the callback has already run whenever rAF fires synchronously.
+    const onScroll = () => {
+      if (pending) return
+      pending = true
+      frame = window.requestAnimationFrame(measure)
+    }
+    feed.addEventListener('scroll', onScroll, { passive: true })
+    measure()
+    // Entries load in batches, so the scrollable height grows after mount.
+    const ro = new ResizeObserver(measure)
+    ro.observe(feed)
+    if (feed.firstElementChild) ro.observe(feed.firstElementChild)
+    return () => {
+      feed.removeEventListener('scroll', onScroll)
+      ro.disconnect()
+      if (frame != null) window.cancelAnimationFrame(frame)
+    }
+  }, [current?.id, view])
+
+  const scrollFeedTo = useCallback((edge: 'top' | 'bottom') => {
+    const el = feedRef.current
+    if (!el) return
+    el.scrollTo({ top: edge === 'top' ? 0 : el.scrollHeight, behavior: 'smooth' })
+  }, [])
+
   const handleMarkerClick = useCallback((entryId: string) => {
     const el = document.querySelector(`[data-entry-id="${entryId}"]`)
     if (!el) return
@@ -206,12 +276,11 @@ export function useJourneyDetail() {
   }, [view])
 
   // On desktop we run a two-pane layout where only the feed column scrolls;
-  // the body must not scroll underneath it. Restore on unmount.
+  // the body must not scroll underneath it. Goes through the shared counter so a
+  // modal opening on top of it cannot hand the page back early (#1809).
   useEffect(() => {
     if (isMobile) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    return lockBodyScroll()
   }, [isMobile])
 
   // Map only shows real journal entries — skeletons are trip-derived
@@ -231,7 +300,7 @@ export function useJourneyDetail() {
       (current?.entries || [])
         .filter(e => e.title !== 'Gallery' && e.title !== '[Trip Photos]')
         .map(e => e.entry_date)
-        .sort()
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     )]
     const sorted = [...mapEntries].sort((a, b) => a.entry_date.localeCompare(b.entry_date))
     const dayCounters = new Map<string, number>()
@@ -262,19 +331,51 @@ export function useJourneyDetail() {
   const tripDates = useMemo(() => {
     const dates = new Set<string>()
     if (!current?.trips) return dates
+    // The days are walked in local time, so the key has to be built from the local parts —
+    // toISOString() would shift the whole range by a day in every timezone east of UTC.
+    const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     for (const trip of current.trips) {
       if (!trip.start_date || !trip.end_date) continue
       const start = new Date(trip.start_date + 'T00:00:00')
       const end = new Date(trip.end_date + 'T00:00:00')
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        dates.add(d.toISOString().split('T')[0])
+        dates.add(dateKey(d))
       }
     }
     return dates
   }, [current?.trips])
 
+  /** Studio's margin to the window on all four sides — see `.st-root` in studio.css. */
+  const STUDIO_INSET = 16
+
+  /**
+   * Open TREK Studio.
+   *
+   * The button's own rect travels along in the navigation state so the panel can
+   * grow out of the button instead of appearing from nowhere. The origin is
+   * expressed inside the panel's box, which starts 16px in from the left and
+   * `--nav-h + 16px` down from the top (see studio.css).
+   */
+  const openStudio = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    navigate(`/journey/${id}/studio`, {
+      state: {
+        studioOrigin: {
+          x: Math.round(r.left + r.width / 2 - STUDIO_INSET),
+          y: Math.round(r.top + r.height / 2 - STUDIO_INSET),
+        },
+      },
+    })
+  }, [navigate, id])
+
+  /** Warm the Studio chunk on hover so the click is not spent downloading it. */
+  const prefetchStudio = useCallback(() => {
+    void import('../JourneyStudioPage')
+  }, [])
+
   return {
     id, navigate, toast, t, locale,
+    openStudio, prefetchStudio,
     current, loading,
     canEditEntries, canEditJourney, myRole,
     view, setView, activeEntryId, setActiveEntryId, feedRef,
@@ -283,8 +384,9 @@ export function useJourneyDetail() {
     showInvite, setShowInvite, showAddTrip, setShowAddTrip,
     unlinkTrip, setUnlinkTrip, showSettings, setShowSettings,
     hideSkeletons, setHideSkeletons,
-    mapRef, fullMapRef, activeLocationId, handleMarkerClick, handleLocationClick,
-    mapEntries, sidebarMapItems, tripDates, isMobile,
+    mapRef, fullMapRef, galleryUploadRef, activeLocationId, handleMarkerClick, handleLocationClick,
+    mapEntries, sidebarMapItems, tripDates, isMobile, tracks,
+    feedEdge, scrollFeedTo,
     loadJourney, updateEntry, deleteEntry, reorderEntries, uploadPhotos, deletePhoto,
   }
 }

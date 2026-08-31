@@ -24,7 +24,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Πρότυπο Χάρτη',
   'settings.mapTemplatePlaceholder.select': 'Επιλέξτε πρότυπο...',
   'settings.mapDefaultHint': 'Αφήστε κενό για OpenStreetMap (προεπιλογή)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'Πρότυπο URL για πλακίδια χάρτη',
   'settings.mapProvider': 'Πάροχος Χάρτη',
   'settings.mapProviderHint':
@@ -36,6 +35,12 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox Access Token',
   'settings.mapMapboxTokenHint': 'Δημόσιο token (pk.*) από',
   'settings.mapMapboxTokenLink': 'mapbox.com → Access tokens',
+  'settings.mapCartoKey': 'Κλειδί API CARTO',
+  'settings.mapCartoKeyHint':
+    'Οι βασικοί χάρτες CARTO εμφανίζουν υδατογράφημα χωρίς κλειδί. Δωρεάν, χωρίς λογαριασμό, από',
+  'settings.mapCartoKeyLink': 'κλειδί API βασικών χαρτών carto.com',
+  'settings.mapCartoKeyMissing':
+    'Αυτό το πρότυπο είναι βασικός χάρτης CARTO. Χωρίς κλειδί, η CARTO τυπώνει "API KEY REQUIRED" σε κάθε πλακίδιο. Μέχρι να εισαγάγετε κλειδί, το TREK εμφανίζει τον προεπιλεγμένο βασικό χάρτη.',
   'settings.mapStyle': 'Στυλ Χάρτη',
   'settings.mapStylePlaceholder': 'Επιλέξτε ένα στυλ Mapbox',
   'settings.mapStyleHint': 'Προκαθορισμένο ή δικό σας mapbox://styles/USER/ID URL',
@@ -86,6 +91,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Υπενθυμίσεις ταξιδιού',
   'settings.notifyTodoDue': 'Εκκρεμότητα λήγει σύντομα',
   'settings.notifyVacayInvite': 'Προσκλήσεις Vacay fusion',
+  'settings.notifyVacayShare': 'Κοινοποιήσεις ημερολογίου Vacay',
   'settings.notifyPhotosShared': 'Κοινόχρηστες φωτογραφίες (Immich)',
   'settings.notifyCollabMessage': 'Μηνύματα συνομιλίας (Collab)',
   'settings.notifyPackingTagged': 'Λίστα πακεταρίσματος: αναθέσεις',
@@ -227,6 +233,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Αίτημα Λειτουργίας',
   'settings.about.featureRequestHint': 'Προτείνετε ένα νέο χαρακτηριστικό',
   'settings.about.wikiHint': 'Τεκμηρίωση & οδηγοί',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Μηνιαίοι Υποστηρικτές',
   'settings.about.supporters.title': 'Συνταξιδιώτες για το TREK',
   'settings.about.supporters.subtitle':
@@ -279,6 +289,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Η εικόνα προφίλ ενημερώθηκε',
   'settings.avatarRemoved': 'Η εικόνα προφίλ αφαιρέθηκε',
   'settings.avatarError': 'Η μεταφόρτωση απέτυχε',
+  'settings.avatarRemoveError': 'Η αφαίρεση απέτυχε',
   'settings.mfa.title': 'Έλεγχος ταυτότητας δύο παραγόντων (2FA)',
   'settings.mfa.description':
     'Προσθέτει ένα δεύτερο βήμα όταν συνδέεστε με email και κωδικό. Χρησιμοποιήστε μια εφαρμογή authenticator (Google Authenticator, Authy, κ.λπ.).',
@@ -308,8 +319,9 @@ const settings: TranslationStrings = {
   'settings.mfa.toastEnabled': 'Ο έλεγχος ταυτότητας δύο παραγόντων ενεργοποιήθηκε',
   'settings.mfa.toastDisabled': 'Ο έλεγχος ταυτότητας δύο παραγόντων απενεργοποιήθηκε',
   'settings.mfa.demoBlocked': 'Δεν είναι διαθέσιμο σε λειτουργία demo',
-  'settings.currency': 'Currency',
-  'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currency': 'Νόμισμα εμφάνισης',
+  'settings.currencyHint':
+    'Τα ποσά στα Κόστη εμφανίζονται σε αυτό το νόμισμα μόνο για λόγους προβολής — τα αρχικά ποσά δεν αλλάζουν.',
   'settings.currencyTrip': 'Νόμισμα ταξιδιού',
   'settings.passkey.title': 'Passkeys',
   'settings.passkey.description':
@@ -358,11 +370,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Η σύνδεση απέτυχε',
   'settings.aiParsing.title': 'Ανάλυση με AI',
   'settings.aiParsing.hint':
-    'Χρησιμοποιήστε το δικό σας μοντέλο AI για την εξαγωγή κρατήσεων από τα αρχεία που ανεβάζετε. Ισχύει μόνο όταν ο διαχειριστής σας δεν έχει ρυθμίσει μοντέλο για ολόκληρη την εγκατάσταση.',
+    'Επιλέξτε το μοντέλο AI που χρησιμοποιείται για την εξαγωγή κρατήσεων από τα αρχεία που ανεβάζετε. Ισχύει μόνο όταν ο διαχειριστής σας δεν έχει ρυθμίσει μοντέλο για ολόκληρη την εγκατάσταση.',
   'settings.aiParsing.provider': 'Πάροχος',
   'settings.aiParsing.providerLocal': 'Τοπικό (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'Ένα τοπικό τελικό σημείο (Ollama) ρυθμίζεται μία φορά για ολόκληρη την εγκατάσταση στις ρυθμίσεις διαχειριστή. Μπορείτε να συνεχίσετε να χρησιμοποιείτε εδώ το δικό σας κλειδί OpenAI ή Anthropic.',
   'settings.aiParsing.model': 'Μοντέλο',
   'settings.aiParsing.baseUrl': 'Βασικό URL',
   'settings.aiParsing.baseUrlHint':
@@ -438,8 +452,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Κάτω γραμμή πλοήγησης',
+  'settings.appearance.mobileNav.hint':
+    'Επιλέξτε ποια στοιχεία εμφανίζονται στη γραμμή και ποια βρίσκονται στο μενού «Περισσότερα». Ο πίνακας ελέγχου παραμένει πάντα πρώτος.',
+  'settings.appearance.mobileNav.inBar': 'Στη γραμμή',
+  'settings.appearance.mobileNav.underMore': 'Στο μενού «Περισσότερα»',
+  'settings.appearance.mobileNav.moreEmpty': 'Τίποτα εδώ ακόμη — όλα χωρούν στη γραμμή.',
+  'settings.appearance.mobileNav.pinned': 'Καρφιτσωμένο',
+  'settings.appearance.mobileNav.toMore': 'Μετακίνηση στο μενού «Περισσότερα»',
+  'settings.appearance.mobileNav.toBar': 'Μετακίνηση στη γραμμή',
+  'settings.appearance.dashOrder': 'Σειρά πίνακα',
+  'settings.appearance.dashOrder.hint':
+    'Αλλάξτε τη σειρά με την οποία στοιβάζονται η λίστα ταξιδιών και τα widget στον πίνακα του κινητού σας. Το προβεβλημένο ταξίδι παραμένει πάντα στην κορυφή.',
+  'settings.appearance.dashOrder.trips': 'Ταξίδια',
+  'settings.appearance.dashOrder.hidden': 'Κρυφό',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': 'Εκκίνηση',
+  'settings.startPage': 'Αρχική σελίδα',
+  'settings.startPageDashboard': 'Πίνακας ελέγχου',
+  'settings.startPageActiveTrip': 'Ενεργό ταξίδι',
+  'settings.startPageHint':
+    'Το TREK ανοίγει απευθείας στο ταξίδι που είναι σε εξέλιξη ή στο επόμενο που ξεκινά. Είναι το ίδιο ταξίδι που προβάλλει ο πίνακας ελέγχου.',
+  'settings.startTripTab': 'Αρχική καρτέλα',
+  'settings.startTripTabHint':
+    'Η καρτέλα με την οποία ανοίγει το ταξίδι. Αν ανήκει σε απενεργοποιημένο πρόσθετο, ανοίγει το πλάνο.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': 'Προσωρινή μνήμη εκτός σύνδεσης',
@@ -505,7 +542,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': 'Πότε',
   'settings.pluginActivity.columns.status': 'Αποτέλεσμα',
   'settings.alwaysShowRoutes': 'Πάντα εμφάνιση διαδρομών κράτησης',
-  'settings.alwaysShowRoutesHint': 'Εμφανίζει αυτόματα στον χάρτη τη διαδρομή κάθε πτήσης, τρένου και άλλης κράτησης, χωρίς να χρειάζεται να την ενεργοποιείτε μία προς μία.',
+  'settings.alwaysShowRoutesHint':
+    'Εμφανίζει αυτόματα στον χάρτη τη διαδρομή κάθε πτήσης, τρένου και άλλης κράτησης, χωρίς να χρειάζεται να την ενεργοποιείτε μία προς μία.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'Κλειδιά API',
+  'settings.apiKeys.description': 'Κλειδιά για το δημόσιο API, ώστε άλλο λογισμικό να μπορεί να διαβάζει τα ταξίδια σου. Μόνο για ανάγνωση: ένα κλειδί δεν μπορεί να αλλάξει ή να διαγράψει τίποτα.',
+  'settings.apiKeys.create': 'Δημιουργία κλειδιού',
+  'settings.apiKeys.empty': 'Δεν υπάρχουν κλειδιά ακόμη. Δημιούργησε ένα για να συνδέσεις άλλο λογισμικό.',
+  'settings.apiKeys.createdAt': 'δημιουργήθηκε',
+  'settings.apiKeys.usedAt': 'τελευταία χρήση',
+  'settings.apiKeys.deleteTitle': 'Διαγραφή κλειδιού',
+  'settings.apiKeys.deleteMessage': 'Ό,τι χρησιμοποιεί αυτό το κλειδί σταματά αμέσως να λειτουργεί. Η ενέργεια δεν αναιρείται.',
+  'settings.apiKeys.deleted': 'Το κλειδί διαγράφηκε',
+  'settings.apiKeys.deleteFailed': 'Δεν ήταν δυνατή η διαγραφή του κλειδιού',
+  'settings.apiKeys.createFailed': 'Δεν ήταν δυνατή η δημιουργία του κλειδιού',
+  'settings.apiKeys.copy': 'Αντιγραφή',
+  'settings.apiKeys.docsHint': 'Στείλε το κλειδί ως "Authorization: Bearer ..." ή "X-API-Key: ..." στο /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Δημιουργία κλειδιού API',
+  'settings.apiKeys.modal.name': 'Όνομα',
+  'settings.apiKeys.modal.namePlaceholder': 'π.χ. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Μόνο για σένα, για να αναγνωρίζεις το κλειδί αργότερα.',
+  'settings.apiKeys.modal.creating': 'Δημιουργία...',
+  'settings.apiKeys.modal.create': 'Δημιουργία',
+  'settings.apiKeys.modal.createdTitle': 'Το κλειδί API δημιουργήθηκε',
+  'settings.apiKeys.modal.createdWarning': 'Αντίγραψε το κλειδί τώρα. Εμφανίζεται μία φορά και δεν μπορεί να ανακτηθεί αργότερα.',
+  'settings.apiKeys.modal.done': 'Έτοιμο',
 };
 
 export default settings;

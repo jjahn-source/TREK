@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from 'axios'
 import type { z } from 'zod'
+import type { Place } from '../types'
+import { randomId } from '../utils/randomId'
 import {
   weatherResultSchema, type WeatherResult,
   inAppListResultSchema, type InAppListResult,
@@ -7,9 +9,11 @@ import {
   channelTestResultSchema,
   mapsSearchResultSchema, mapsAutocompleteResultSchema, mapsPlaceDetailsResultSchema,
   mapsPlacePhotoResultSchema, mapsReverseResultSchema, mapsResolveUrlResultSchema,
+  mapsPlaceEnrichmentResultSchema,
   type NotificationRespondRequest,
   type SettingUpsertRequest, type SettingsBulkRequest,
-  type JourneyCreateRequest, type JourneyAddTripRequest,
+  type JourneyCreateRequest, type JourneyAddTripRequest, type JourneyTracksResponse,
+  type JourneyStats, type BookRecord, type BookSaveRequest,
   type JourneyReorderEntriesRequest, type JourneyProviderPhotosRequest,
   type JourneyShareLinkRequest,
   type RegisterRequest, type LoginRequest, type ForgotPasswordRequest,
@@ -18,7 +22,7 @@ import {
   type TripAddMemberRequest, type TripTransferOwnershipRequest,
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
-  type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest,
+  type TripCreateRequest, type TripUpdateRequest, type TripCopyRequest, type ActiveTripResponse,
   type DayCreateRequest, type DayUpdateRequest, type DayReorderRequest,
   type PlaceCreateRequest, type PlaceUpdateRequest,
   type ReservationCreateRequest, type ReservationUpdateRequest,
@@ -26,7 +30,7 @@ import {
   type BudgetCreateItemRequest, type BudgetUpdateItemRequest,
   type PackingCreateItemRequest, type PackingUpdateItemRequest, type PackingSetSharingRequest,
   type TodoCreateItemRequest, type TodoUpdateItemRequest,
-  type AssignmentCreateRequest, type AssignmentParticipantsRequest, type AssignmentTimeRequest,
+  type AssignmentCreateRequest, type AssignmentParticipantsRequest, type AssignmentTimeRequest, type AssignmentTransportRequest,
   type PlaceBulkDeleteRequest,
   type PlaceBulkUpdateRequest,
   type DayNoteCreateRequest, type DayNoteUpdateRequest,
@@ -44,9 +48,15 @@ import {
   type BookingImportPreviewResponse,
   type BookingImportConfirmResponse,
   type BookingImportMode,
+  type StorageAdminState,
+  type StorageBackend,
+  type StorageConfigPut,
+  type StorageTestResponse,
+  type StorageUsage,
 } from '@trek/shared'
 import { getSocketId } from './websocket'
 import { probeNow } from '../sync/connectivity'
+import { downloadBlob } from '../utils/fileDownload'
 
 /**
  * Validate a response payload against its @trek/shared Zod schema — but only in
@@ -104,6 +114,9 @@ const RATE_LIMIT_MESSAGES: Record<string, string> = {
   ko:      '시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   uk:      'Занадто багато спроб. Спробуйте пізніше.',
   sv:      'För många försök. Prova igen senare.',
+  ca:      'Massa intents. Torneu-ho a provar més tard.',
+  gr:      'Πάρα πολλές προσπάθειες. Δοκιμάστε ξανά αργότερα.',
+  vi:      'Quá nhiều lần thử. Vui lòng thử lại sau.',
 }
 
 function translateRateLimit(): string {
@@ -139,10 +152,7 @@ apiClient.interceptors.request.use(
       // The mutation queue sets its own pre-generated key; skip if already set.
       const method = (config.method ?? '').toLowerCase()
       if (MUTATING_METHODS.has(method) && !config.headers['X-Idempotency-Key']) {
-        const key = typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2)
-        config.headers['X-Idempotency-Key'] = key
+        config.headers['X-Idempotency-Key'] = randomId()
       }
       return config
     },
@@ -227,9 +237,11 @@ apiClient.interceptors.response.use(
       }
       if (error.response?.status === 429) {
         const translated = translateRateLimit()
-        const data = error.response.data as { error?: string } | undefined
-        if (data && typeof data === 'object') {
-          data.error = translated
+        const data = error.response.data
+        // Only a plain object body carries an `error` field worth overwriting;
+        // an array (a validation-error list) or a string is replaced outright.
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          (data as { error?: string }).error = translated
         } else {
           error.response.data = { error: translated }
         }
@@ -303,6 +315,14 @@ export const authApi = {
     create: (name: string) => apiClient.post('/auth/mcp-tokens', { name } satisfies McpTokenCreateRequest).then(r => r.data),
     delete: (id: number) => apiClient.delete(`/auth/mcp-tokens/${id}`).then(r => r.data),
   },
+  // Keys for the public API. Same shape as the MCP tokens above and a separate
+  // credential: one drives the assistant tools, the other reads trips over HTTP,
+  // and a key of the wrong kind is refused like one that does not exist.
+  apiKeys: {
+    list: () => apiClient.get('/auth/api-tokens').then(r => r.data),
+    create: (name: string) => apiClient.post('/auth/api-tokens', { name } satisfies McpTokenCreateRequest).then(r => r.data),
+    delete: (id: number) => apiClient.delete(`/auth/api-tokens/${id}`).then(r => r.data),
+  },
   passkey: {
     registerOptions: (password: string) => apiClient.post('/auth/passkey/register/options', { password }).then(r => r.data),
     registerVerify: (attestationResponse: unknown, name?: string) => apiClient.post('/auth/passkey/register/verify', { attestationResponse, name }).then(r => r.data),
@@ -366,6 +386,9 @@ export const tripsApi = {
   list: (params?: Record<string, unknown>) => apiClient.get('/trips', { params }).then(r => r.data),
   create: (data: TripCreateRequest) => apiClient.post('/trips', data).then(r => r.data),
   get: (id: number | string) => apiClient.get(`/trips/${id}`).then(r => r.data),
+  // The startup redirect's one lookup — deliberately not list(), which would pull
+  // every trip with its counts just to read one id.
+  active: (): Promise<ActiveTripResponse> => apiClient.get('/trips/active').then(r => r.data),
   update: (id: number | string, data: TripUpdateRequest) => apiClient.put(`/trips/${id}`, data).then(r => r.data),
   delete: (id: number | string) => apiClient.delete(`/trips/${id}`).then(r => r.data),
   uploadCover: (id: number | string, formData: FormData) => postMultipart(`/trips/${id}/cover`, formData),
@@ -387,6 +410,8 @@ export const daysApi = {
   list: (tripId: number | string) => apiClient.get(`/trips/${tripId}/days`).then(r => r.data),
   create: (tripId: number | string, data: DayCreateRequest) => apiClient.post(`/trips/${tripId}/days`, data).then(r => r.data),
   update: (tripId: number | string, dayId: number | string, data: DayUpdateRequest) => apiClient.put(`/trips/${tripId}/days/${dayId}`, data).then(r => r.data),
+  // Whole-day default route mode (#1281); per-segment leg modes override it.
+  updateTransport: (tripId: number | string, dayId: number | string, mode: string | null) => apiClient.put(`/trips/${tripId}/days/${dayId}/transport`, { transport_mode: mode }).then(r => r.data),
   delete: (tripId: number | string, dayId: number | string) => apiClient.delete(`/trips/${tripId}/days/${dayId}`).then(r => r.data),
   reorder: (tripId: number | string, orderedIds: number[]) => apiClient.put(`/trips/${tripId}/days/reorder`, { orderedIds } satisfies DayReorderRequest).then(r => r.data),
 }
@@ -398,6 +423,15 @@ export const placesApi = {
   update: (tripId: number | string, id: number | string, data: PlaceUpdateRequest) => apiClient.put(`/trips/${tripId}/places/${id}`, data).then(r => r.data),
   delete: (tripId: number | string, id: number | string) => apiClient.delete(`/trips/${tripId}/places/${id}`).then(r => r.data),
   searchImage: (tripId: number | string, id: number | string) => apiClient.get(`/trips/${tripId}/places/${id}/image`).then(r => r.data),
+  uploadImage: (tripId: number | string, id: number | string, file: File) => {
+    const fd = new FormData()
+    fd.append('image', file)
+    return postMultipart<{ place: Place }>(`/trips/${tripId}/places/${id}/image`, fd)
+  },
+  rate: (tripId: number | string, id: number | string, rating: number | null): Promise<{ place: Place }> =>
+    rating === null
+      ? apiClient.delete(`/trips/${tripId}/places/${id}/rating`).then(r => r.data)
+      : apiClient.put(`/trips/${tripId}/places/${id}/rating`, { rating }).then(r => r.data),
   importGpx: (tripId: number | string, file: File, opts?: { waypoints?: boolean; routes?: boolean; tracks?: boolean }) => {
     const fd = new FormData()
     fd.append('file', file)
@@ -433,6 +467,10 @@ export const assignmentsApi = {
   getParticipants: (tripId: number | string, id: number) => apiClient.get(`/trips/${tripId}/assignments/${id}/participants`).then(r => r.data),
   setParticipants: (tripId: number | string, id: number, userIds: number[]) => apiClient.put(`/trips/${tripId}/assignments/${id}/participants`, { user_ids: userIds } satisfies AssignmentParticipantsRequest).then(r => r.data),
   updateTime: (tripId: number | string, id: number, times: AssignmentTimeRequest) => apiClient.put(`/trips/${tripId}/assignments/${id}/time`, times).then(r => r.data),
+  // Per-segment travel mode (#1281): mode of the leg leaving this stop (null = inherit day default).
+  // direction defaults to 'outgoing' server-side, so only send it for the incoming (boundary-leg) case
+  // and keep the outgoing payload byte-for-byte identical to the pre-#1281 shape.
+  updateTransport: (tripId: number | string, id: number, mode: string | null, direction: 'outgoing' | 'incoming' = 'outgoing') => apiClient.put(`/trips/${tripId}/assignments/${id}/transport`, (direction === 'incoming' ? { transport_mode: mode, direction } : { transport_mode: mode }) satisfies Partial<AssignmentTransportRequest>).then(r => r.data),
 }
 
 export const packingApi = {
@@ -501,7 +539,12 @@ export const adminApi = {
     apiClient.post('/admin/plugins/install', { id, ...opts }).then(r => r.data),
   pluginActivate: (id: string, consent?: boolean) => apiClient.post(`/admin/plugins/${id}/activate`, consent ? { consent: true } : {}).then(r => r.data),
   pluginDeactivate: (id: string) => apiClient.post(`/admin/plugins/${id}/deactivate`).then(r => r.data),
-  pluginUpdate: (id: string) => apiClient.post(`/admin/plugins/${id}/update`).then(r => r.data),
+  // `version` pins the exact version to install (the rollback path); omitted, the server
+  // resolves the newest TREK-compatible version itself.
+  pluginUpdate: (id: string, version?: string) =>
+    apiClient.post(`/admin/plugins/${id}/update`, version ? { version } : {}).then(r => r.data),
+  // Release a per-plugin update hold (set by a deliberate non-latest install).
+  pluginResumeUpdates: (id: string) => apiClient.post(`/admin/plugins/${id}/resume-updates`).then(r => r.data),
   // Re-trust a ROTATED author signing key and update, in ONE call. `publicKey` is the
   // full key the admin was shown (not a fingerprint): the server compares it exactly, so
   // it can refuse if the registry entry was re-keyed again since the dialog rendered.
@@ -537,24 +580,35 @@ export const adminApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ baseUrl, model }),
     })
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       let msg = `Pull failed (${res.status})`
       try { msg = (await res.json())?.error ?? msg } catch { /* non-json */ }
       throw new Error(msg)
     }
+    // An accepted request without a stream can't be followed to completion.
+    if (!res.body) throw new Error('Pull returned no progress stream')
     const reader = res.body.getReader()
     const dec = new TextDecoder()
     let buf = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += dec.decode(value, { stream: true })
-      const lines = buf.split('\n')
-      buf = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        try { onProgress(JSON.parse(line)) } catch { /* skip partial */ }
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        // split() always yields at least one element; the last one is the
+        // trailing (possibly partial) line carried into the next chunk.
+        const lines = buf.split('\n')
+        buf = lines.pop()!
+        for (const line of lines) {
+          if (!line.trim()) continue
+          // Only the parse is swallowed — a throw from onProgress aborts the pull.
+          let frame: { status?: string; total?: number; completed?: number; error?: string }
+          try { frame = JSON.parse(line) } catch { continue }
+          onProgress(frame)
+        }
       }
+    } finally {
+      reader.cancel().catch(() => {})
     }
   },
   checkVersion: () => apiClient.get('/admin/version-check').then(r => r.data),
@@ -566,6 +620,8 @@ export const adminApi = {
   updatePlacesAutocomplete: (enabled: boolean) => apiClient.put('/admin/places-autocomplete', { enabled }).then(r => r.data),
   getPlacesDetails: () => apiClient.get('/admin/places-details').then(r => r.data),
   updatePlacesDetails: (enabled: boolean) => apiClient.put('/admin/places-details', { enabled }).then(r => r.data),
+  getPlacesEnrich: () => apiClient.get('/admin/places-enrich').then(r => r.data),
+  updatePlacesEnrich: (enabled: boolean) => apiClient.put('/admin/places-enrich', { enabled }).then(r => r.data),
   getCollabFeatures: () => apiClient.get('/admin/collab-features').then(r => r.data),
   updateCollabFeatures: (features: Record<string, boolean>) => apiClient.put('/admin/collab-features', features).then(r => r.data),
   packingTemplates: () => apiClient.get('/admin/packing-templates').then(r => r.data),
@@ -598,6 +654,26 @@ export const adminApi = {
   updateNotificationPreferences: (prefs: Record<string, Record<string, boolean>>) => apiClient.put('/admin/notification-preferences', prefs).then(r => r.data),
   getDefaultUserSettings: () => apiClient.get('/admin/default-user-settings').then(r => r.data),
   updateDefaultUserSettings: (settings: Record<string, unknown>) => apiClient.put('/admin/default-user-settings', settings).then(r => r.data),
+  getStorage: (): Promise<StorageAdminState> => apiClient.get('/admin/storage').then(r => r.data),
+  updateStorage: (config: StorageConfigPut): Promise<StorageAdminState> =>
+    apiClient.put('/admin/storage', config).then(r => r.data),
+  // A probe is bounded by the target driver's own timeout (default 30s, ×2 with
+  // one retry) and a mirror probes its targets sequentially — the instance-wide
+  // 8s axios timeout would abort a legitimate slow probe, so this call carries
+  // its own generous ceiling.
+  testStorageBackend: (backend: StorageBackend): Promise<StorageTestResponse> =>
+    apiClient.post('/admin/storage/test', { backend }, { timeout: 120_000 }).then(r => r.data),
+  startStorageBackfill: (backend: string): Promise<{ started: true }> =>
+    apiClient.post(`/admin/storage/backends/${encodeURIComponent(backend)}/backfill`).then(r => r.data),
+  cancelStorageBackfill: (backend: string): Promise<{ cancelled: true }> =>
+    apiClient.delete(`/admin/storage/backends/${encodeURIComponent(backend)}/backfill`).then(r => r.data),
+  startStorageMigration: (category: string, to: string): Promise<{ started: true }> =>
+    apiClient.post('/admin/storage/migrations', { category, to }).then(r => r.data),
+  cancelStorageMigration: (category: string): Promise<{ cancelled: true }> =>
+    apiClient.delete(`/admin/storage/migrations/${encodeURIComponent(category)}`).then(r => r.data),
+  // A full scan of a large install can exceed the 8s instance timeout.
+  refreshStorageStats: (): Promise<StorageUsage> =>
+    apiClient.post('/admin/storage/stats/refresh', undefined, { timeout: 120_000 }).then(r => r.data),
 }
 
 export const addonsApi = {
@@ -622,6 +698,74 @@ export interface PluginMapMarker {
   pluginId: string; id: string; lat: number; lng: number;
   label?: string; popupText?: string; url?: string; icon?: string;
   tone: 'default' | 'success' | 'warn' | 'danger'
+}
+
+/** One shape of a plugin map layer (mapLayerProvider hook). Server-normalized:
+ * coordinates range-checked, vertex budget capped, styling clamped to the tone
+ * palette + bounded numerics — never free-form CSS or markup. */
+export interface PluginMapLayerFeature {
+  type: 'polyline' | 'polygon' | 'circle';
+  points?: Array<[number, number]>;
+  center?: [number, number];
+  radiusM?: number;
+  tone: 'default' | 'success' | 'warn' | 'danger';
+  width: number;
+  dash: 'solid' | 'dash' | 'dot';
+  opacity: number;
+  fill: boolean;
+  label?: string;
+}
+
+/** A vector overlay a plugin draws on the trip map (routes, corridors, zones). */
+export interface PluginMapLayer {
+  pluginId: string; id: string; name?: string;
+  features: PluginMapLayerFeature[];
+}
+
+/** A time contribution a dayScheduleProvider plugin attaches to the day plan
+ * ("35 min charging at this stop"). Server-normalized: dayIds checked against
+ * the trip, minutes clamped to a day, labels sanitized + capped. */
+export interface PluginDayScheduleItem {
+  pluginId: string; id: string; dayId: number;
+  assignmentId?: number; reservationId?: number;
+  position?: 'start' | 'end';
+  minutes?: number; label: string;
+  tone: 'default' | 'success' | 'warn' | 'danger';
+}
+
+/** The colours a dayTintProvider plugin puts into one day card, so leg membership is
+ * visible while scrolling the itinerary. The card has three separately tintable
+ * regions; an absent one is not tinted and renders exactly as it does with no plugin.
+ * Server-normalized: dayIds checked against the trip, one contribution per day (first
+ * granted provider wins), the `tone` / `color` shorthands already resolved into the
+ * regions, labels sanitized + capped.
+ *
+ * A region carries EITHER a tone from the fixed palette or the plugin's own colour,
+ * never both — the server picked the winner. `*Color` is guaranteed `#rrggbb` (nothing
+ * else survives normalization, because it lands inside a CSS value); the client still
+ * owns how strongly it renders — alpha per theme and per region, lightness clamped
+ * into a readable band. */
+export type PluginDayTintTone = 'default' | 'success' | 'warn' | 'danger'
+export interface PluginDayTint {
+  pluginId: string; dayId: number;
+  badgeTone?: PluginDayTintTone;
+  badgeColor?: string;
+  headerTone?: PluginDayTintTone;
+  headerColor?: string;
+  activityTone?: PluginDayTintTone;
+  activityColor?: string;
+  label?: string;
+}
+
+/** A route computed by a routeProvider plugin (server-normalized: coordinates
+ * range-checked, legs forced to waypoints-1, vias capped). null = provider failed
+ * or refused — the caller falls back to straight lines like on an OSRM outage. */
+export interface PluginRouteResult {
+  pluginId: string; profile: string;
+  coordinates: Array<[number, number]>;
+  distance: number; duration: number;
+  legs: Array<{ distance: number; duration: number; note?: string }>;
+  viaPoints: Array<{ lat: number; lng: number; label?: string; tone: 'default' | 'success' | 'warn' | 'danger'; dwellSeconds?: number }>;
 }
 
 /** A text-only section a pdfSectionProvider plugin appends to the trip PDF export.
@@ -667,6 +811,23 @@ export const pluginsApi = {
   // (#587). Host-normalized + range-checked; fail-safe (skips slow/failing providers).
   mapMarkers: (tripId: number | string) =>
     apiClient.get(`/map-markers/${tripId}`).then(r => r.data as { markers: PluginMapMarker[] }),
+  // Vector overlays (polylines/polygons/circles) plugins draw on the trip map via
+  // the mapLayerProvider hook. Host-normalized + vertex-budgeted; fail-safe.
+  mapLayers: (tripId: number | string) =>
+    apiClient.get(`/map-layers/${tripId}`).then(r => r.data as { layers: PluginMapLayer[] }),
+  // Route the given waypoints through ONE routeProvider plugin profile (targeted,
+  // not a fan-out — the user picked this profile in the route toggle). Slow by
+  // design (external solvers): the server allows the plugin 20 s.
+  pluginRoute: (pluginId: string, profileId: string, body: { tripId: number | string; dayId?: number | null; waypoints: Array<{ lat: number; lng: number; name?: string; placeId?: number }> }, opts: { signal?: AbortSignal } = {}) =>
+    apiClient.post(`/plugin-routes/${pluginId}/${profileId}`, body, { timeout: 25000, signal: opts.signal }).then(r => r.data as { route: PluginRouteResult | null }),
+  // Time contributions plugins attach to the day plan via the dayScheduleProvider
+  // hook (charging stops, security buffers). Host-normalized; fail-safe.
+  daySchedule: (tripId: number | string) =>
+    apiClient.get(`/day-schedule/${tripId}`).then(r => r.data as { items: PluginDayScheduleItem[] }),
+  // Per-day colours plugins put behind the day cards via the dayTintProvider hook
+  // (which leg of the trip a day belongs to). Host-normalized; fail-safe.
+  dayTints: (tripId: number | string) =>
+    apiClient.get(`/day-tints/${tripId}`).then(r => r.data as { tints: PluginDayTint[] }),
   // Text-only sections plugins append to the trip PDF export via the
   // pdfSectionProvider hook. Host-normalized (counts + lengths capped); fail-safe.
   pdfSections: (tripId: number | string) =>
@@ -764,6 +925,22 @@ export const journeyApi = {
 
   // Entries
   listEntries: (id: number) => apiClient.get(`/journeys/${id}/entries`).then(r => r.data),
+  // GPX tracks of the trips this journey's entries came from (#1260).
+  listTracks: (id: number): Promise<JourneyTracksResponse> => apiClient.get(`/journeys/${id}/tracks`).then(r => r.data),
+  // What the journey adds up to — distance, days, countries, the route (#1973).
+  // Read by TREK Studio, which freezes the answer into the book document.
+  stats: (id: number): Promise<JourneyStats> => apiClient.get(`/journeys/${id}/stats`).then(r => r.data),
+
+  // The Studio book (#1973). `book` is null for a journey that has none yet —
+  // Studio lays one out and the first save creates it.
+  getBook: (id: number): Promise<{ book: BookRecord | null }> =>
+    apiClient.get(`/journeys/${id}/book`).then(r => r.data),
+  // A 409 carries the current record in its body, so a conflict can be shown
+  // rather than only announced. See useBookStore.
+  saveBook: (id: number, body: BookSaveRequest): Promise<BookRecord> =>
+    apiClient.put(`/journeys/${id}/book`, body).then(r => r.data),
+  deleteBook: (id: number): Promise<void> =>
+    apiClient.delete(`/journeys/${id}/book`).then(r => r.data),
   createEntry: (id: number, data: Record<string, unknown>) => apiClient.post(`/journeys/${id}/entries`, data).then(r => r.data),
   updateEntry: (entryId: number, data: Record<string, unknown>) => apiClient.patch(`/journeys/entries/${entryId}`, data).then(r => r.data),
   deleteEntry: (entryId: number) => apiClient.delete(`/journeys/entries/${entryId}`).then(r => r.data),
@@ -803,19 +980,58 @@ export const journeyApi = {
   getPublicJourney: (token: string) => apiClient.get(`/public/journey/${token}`).then(r => r.data),
 }
 
+// Photo providers (Immich, Synology Photos, …) behind /api/integrations/memories.
+// The provider sits on the user's own hardware and the server proxies through to
+// it, so the 8s default does not apply — and neither does any number picked
+// here. The server already holds the deadline, and its worst case is longer than
+// anything that would look reasonable in this file: a Synology call is 30s, and
+// an expired session makes it re-authenticate and try again. A client cap below
+// that turns a slow NAS into a NAS that reads as disconnected, which is what
+// these calls looked like before they moved off raw fetch (which had no timeout
+// either). Callers that need to give up early pass an AbortSignal.
+const MEMORIES_TIMEOUT = 0
+
+export const memoriesApi = {
+  status: (provider: string): Promise<{ connected: boolean }> =>
+    apiClient.get(`/integrations/memories/${provider}/status`, { timeout: MEMORIES_TIMEOUT }).then(r => r.data),
+  search: (provider: string, body: { from: string; to: string; page: number; size: number }, signal?: AbortSignal) =>
+    apiClient.post(`/integrations/memories/${provider}/search`, body, { timeout: MEMORIES_TIMEOUT, signal }).then(r => r.data),
+  albums: (provider: string) =>
+    apiClient.get(`/integrations/memories/${provider}/albums`, { timeout: MEMORIES_TIMEOUT }).then(r => r.data),
+  albumPhotos: (provider: string, albumId: string, passphrase?: string, signal?: AbortSignal) =>
+    apiClient.get(`/integrations/memories/${provider}/albums/${albumId}/photos`, {
+      timeout: MEMORIES_TIMEOUT,
+      params: passphrase ? { passphrase } : undefined,
+      signal,
+    }).then(r => r.data),
+}
+
 export const mapsApi = {
   search: (query: string, lang?: string) => apiClient.post(`/maps/search?lang=${lang || 'en'}`, { query }).then(r => checkInDev(mapsSearchResultSchema, r.data, 'maps.search')),
-  autocomplete: (input: string, lang?: string, locationBias?: { low: { lat: number; lng: number }; high: { lat: number; lng: number } }, signal?: AbortSignal) =>
-      apiClient.post('/maps/autocomplete', { input, lang, locationBias }, { signal }).then(r => checkInDev(mapsAutocompleteResultSchema, r.data, 'maps.autocomplete')),
-  details: (placeId: string, lang?: string) => apiClient.get(`/maps/details/${encodeURIComponent(placeId)}`, { params: { lang } }).then(r => checkInDev(mapsPlaceDetailsResultSchema, r.data, 'maps.details')),
+  autocomplete: (input: string, lang?: string, locationBias?: { low: { lat: number; lng: number }; high: { lat: number; lng: number } }, signal?: AbortSignal, sessionToken?: string) =>
+      apiClient.post('/maps/autocomplete', { input, lang, locationBias, sessionToken }, { signal }).then(r => checkInDev(mapsAutocompleteResultSchema, r.data, 'maps.autocomplete')),
+  details: (placeId: string, lang?: string, sessionToken?: string) => apiClient.get(`/maps/details/${encodeURIComponent(placeId)}`, { params: { lang, sessionToken } }).then(r => checkInDev(mapsPlaceDetailsResultSchema, r.data, 'maps.details')),
+  // Pictures and a description for a place that is being looked at but not yet
+  // saved. Fans out to several providers server-side, so it takes a signal and
+  // the caller is expected to abort it when the selection changes, and a longer
+  // timeout than the global 8s — a cold Wikimedia connection alone can eat that.
+  placeEnrichment: (
+    body: { placeId?: string; lat: number; lng: number; name: string; lang?: string; details?: Record<string, unknown> },
+    signal?: AbortSignal,
+  ) => apiClient.post('/maps/enrichment', body, { signal, timeout: 25000 })
+      .then(r => checkInDev(mapsPlaceEnrichmentResultSchema, r.data, 'maps.placeEnrichment')),
+  // Author + licence for a picture already stored in the photo cache, keyed by
+  // the cache key embedded in its proxy URL. Local read, no provider call.
+  placePhotoCredit: (key: string) =>
+    apiClient.get(`/maps/enrichment/credit/${encodeURIComponent(key)}`).then(r => r.data as { credit: string | null }),
   placePhoto: (placeId: string, lat?: number, lng?: number, name?: string) => apiClient.get(`/maps/place-photo/${encodeURIComponent(placeId)}`, { params: { lat, lng, name } }).then(r => checkInDev(mapsPlacePhotoResultSchema, r.data, 'maps.placePhoto')),
   reverse: (lat: number, lng: number, lang?: string) => apiClient.get('/maps/reverse', { params: { lat, lng, lang } }).then(r => checkInDev(mapsReverseResultSchema, r.data, 'maps.reverse')),
   resolveUrl: (url: string) => apiClient.post('/maps/resolve-url', { url }).then(r => checkInDev(mapsResolveUrlResultSchema, r.data, 'maps.resolveUrl')),
   // OSM-only POI explore: places of a category within the current map viewport bbox.
   // Overpass can be slow on a fresh (uncached) area, so this call gets a longer
   // timeout than the global default instead of aborting at 8s and showing nothing.
-  pois: (category: string, bbox: { south: number; west: number; north: number; east: number }, signal?: AbortSignal) =>
-    apiClient.get('/maps/pois', { params: { category, ...bbox }, signal, timeout: 20000 }).then(r => r.data as { pois: import('../components/Map/poiCategories').Poi[]; source: string; truncated: boolean; clamped?: boolean }),
+  pois: (category: string, bbox: { south: number; west: number; north: number; east: number }, lang?: string, signal?: AbortSignal) =>
+    apiClient.get('/maps/pois', { params: { category, ...bbox, lang }, signal, timeout: 20000 }).then(r => r.data as { pois: import('../components/Map/poiCategories').Poi[]; source: string; truncated: boolean; clamped?: boolean }),
 }
 
 export const airportsApi = {
@@ -860,6 +1076,8 @@ export const reservationsApi = {
   create: (tripId: number | string, data: ReservationCreateRequest) => apiClient.post(`/trips/${tripId}/reservations`, data).then(r => r.data),
   update: (tripId: number | string, id: number, data: ReservationUpdateRequest) => apiClient.put(`/trips/${tripId}/reservations/${id}`, data).then(r => r.data),
   delete: (tripId: number | string, id: number) => apiClient.delete(`/trips/${tripId}/reservations/${id}`).then(r => r.data),
+  // Assign trip members / named guests to a booking (#1517).
+  setTravelers: (tripId: number | string, id: number, userIds: number[]) => apiClient.put(`/trips/${tripId}/reservations/${id}/travelers`, { user_ids: userIds }).then(r => r.data),
   updatePositions: (tripId: number | string, positions: { id: number; day_plan_position: number }[], dayId?: number) => apiClient.put(`/trips/${tripId}/reservations/positions`, { positions, day_id: dayId }).then(r => r.data),
   importBookingPreview: (tripId: number | string, files: File[], mode: BookingImportMode = 'no-ai'): Promise<BookingImportPreviewResponse> => {
     const fd = new FormData()
@@ -889,7 +1107,9 @@ export const healthApi = {
 }
 
 export const weatherApi = {
-  get: (lat: number, lng: number, date: string): Promise<WeatherResult> => apiClient.get('/weather', { params: { lat, lng, date } }).then(r => parseInDev(weatherResultSchema, r.data, 'weather.get')),
+  // `time` (HH:MM) makes a past date answer for that hour instead of the day (#1614).
+  get: (lat: number, lng: number, date: string, time?: string): Promise<WeatherResult> => apiClient.get('/weather', { params: { lat, lng, date, time } }).then(r => parseInDev(weatherResultSchema, r.data, 'weather.get')),
+  getCurrent: (lat: number, lng: number, lang?: string): Promise<WeatherResult> => apiClient.get('/weather', { params: { lat, lng, lang } }).then(r => parseInDev(weatherResultSchema, r.data, 'weather.getCurrent')),
   getDetailed: (lat: number, lng: number, date: string, lang?: string): Promise<WeatherResult> => apiClient.get('/weather/detailed', { params: { lat, lng, date, lang } }).then(r => parseInDev(weatherResultSchema, r.data, 'weather.getDetailed')),
 }
 
@@ -962,13 +1182,7 @@ export const backupApi = {
       credentials: 'include',
     })
     if (!res.ok) throw new Error('Download failed')
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(await res.blob(), filename)
   },
   delete: (filename: string) => apiClient.delete(`/backup/${filename}`).then(r => r.data),
   restore: (filename: string) => apiClient.post(`/backup/restore/${filename}`).then(r => r.data),

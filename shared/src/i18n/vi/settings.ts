@@ -23,7 +23,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Mẫu bản đồ',
   'settings.mapTemplatePlaceholder.select': 'Chọn mẫu...',
   'settings.mapDefaultHint': 'Để trống cho OpenStreetMap (mặc định)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'Mẫu URL cho ô bản đồ',
   'settings.mapProvider': 'Nhà cung cấp bản đồ',
   'settings.mapProviderHint':
@@ -35,6 +34,11 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox Mã thông báo truy cập',
   'settings.mapMapboxTokenHint': 'Mã thông báo công khai (pk.*) từ',
   'settings.mapMapboxTokenLink': 'mapbox.com → Mã thông báo truy cập',
+  'settings.mapCartoKey': 'Khóa API CARTO',
+  'settings.mapCartoKeyHint': 'Bản đồ nền CARTO hiển thị hình mờ nếu không có khóa. Miễn phí, không cần tài khoản, từ',
+  'settings.mapCartoKeyLink': 'khóa API bản đồ nền carto.com',
+  'settings.mapCartoKeyMissing':
+    'Mẫu này là bản đồ nền CARTO. Không có khóa, CARTO in "API KEY REQUIRED" lên mọi ô bản đồ. Cho đến khi bạn nhập khóa, TREK hiển thị bản đồ nền mặc định.',
   'settings.mapStyle': 'Kiểu bản đồ',
   'settings.mapStylePlaceholder': 'Chọn kiểu Mapbox',
   'settings.mapStyleHint': 'Đặt trước hoặc của riêng bạn mapbox://styles/USER/ID URL',
@@ -86,6 +90,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Lời nhắc chuyến đi',
   'settings.notifyTodoDue': 'Việc cần làm sắp đến hạn',
   'settings.notifyVacayInvite': 'Lời mời kết hợp Vacay',
+  'settings.notifyVacayShare': 'Chia sẻ lịch Vacay',
   'settings.notifyPhotosShared': 'Ảnh được chia sẻ (Immich)',
   'settings.notifyCollabMessage': 'Tin nhắn trò chuyện (Cộng tác)',
   'settings.notifyPackingTagged': 'Danh sách đóng gói: phân công',
@@ -225,6 +230,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Yêu cầu tính năng',
   'settings.about.featureRequestHint': 'Đề xuất tính năng mới',
   'settings.about.wikiHint': 'Tài liệu & hướng dẫn',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Người ủng hộ hàng tháng',
   'settings.about.supporters.title': 'Bạn đồng hành cho TREK',
   'settings.about.supporters.subtitle':
@@ -277,6 +286,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Đã cập nhật ảnh hồ sơ',
   'settings.avatarRemoved': 'Đã xóa ảnh hồ sơ',
   'settings.avatarError': 'Tải lên không thành công',
+  'settings.avatarRemoveError': 'Xóa không thành công',
   'settings.mfa.title': 'Xác thực hai yếu tố (2FA)',
   'settings.mfa.description':
     'Thêm bước thứ hai khi bạn đăng nhập bằng email và mật khẩu. Sử dụng ứng dụng xác thực (Google Authenticator, Authy, v.v.).',
@@ -304,8 +314,9 @@ const settings: TranslationStrings = {
   'settings.mfa.toastEnabled': 'Đã bật xác thực hai yếu tố',
   'settings.mfa.toastDisabled': 'Xác thực hai yếu tố bị vô hiệu hóa',
   'settings.mfa.demoBlocked': 'Không có sẵn ở chế độ demo',
-  'settings.currency': 'Tiền tệ',
-  'settings.currencyHint': 'Tất cả số tiền trong Chi phí được chuyển đổi sang và hiển thị bằng loại tiền tệ này.',
+  'settings.currency': 'Tiền tệ hiển thị',
+  'settings.currencyHint':
+    'Số tiền trong Chi phí chỉ được quy đổi sang loại tiền tệ này để hiển thị — số tiền gốc không thay đổi.',
   'settings.currencyTrip': 'Tiền tệ của chuyến đi',
   'settings.passkey.title': 'Mật mã',
   'settings.passkey.description':
@@ -351,11 +362,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Kết nối không thành công',
   'settings.aiParsing.title': 'Phân tích bằng AI',
   'settings.aiParsing.hint':
-    'Sử dụng mô hình AI của riêng bạn để trích xuất đặt chỗ từ các tệp đã tải lên. Tùy chọn này chỉ áp dụng khi quản trị viên chưa cấu hình mô hình cho toàn bộ phiên bản.',
+    'Chọn mô hình AI dùng để trích xuất đặt chỗ từ các tệp đã tải lên. Tùy chọn này chỉ áp dụng khi quản trị viên chưa cấu hình mô hình cho toàn bộ phiên bản.',
   'settings.aiParsing.provider': 'Nhà cung cấp',
   'settings.aiParsing.providerLocal': 'Cục bộ (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'Endpoint cục bộ (Ollama) được thiết lập một lần cho toàn bộ phiên bản trong phần cài đặt quản trị. Bạn vẫn có thể dùng khóa OpenAI hoặc Anthropic của riêng mình ở đây.',
   'settings.aiParsing.model': 'Mô hình',
   'settings.aiParsing.baseUrl': 'URL cơ sở',
   'settings.aiParsing.baseUrlHint': 'Nơi mô hình chạy — máy chủ Ollama cục bộ hoặc endpoint tương thích với OpenAI.',
@@ -430,8 +443,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Tên địa điểm, mô tả',
   'settings.appearance.example.small': 'Địa chỉ, nhãn',
   'settings.appearance.experimental': 'Thử nghiệm',
+  'settings.appearance.mobileNav': 'Thanh điều hướng dưới',
+  'settings.appearance.mobileNav.hint':
+    'Chọn mục nào hiển thị trên thanh và mục nào nằm trong “Thêm”. Bảng điều khiển luôn đứng đầu.',
+  'settings.appearance.mobileNav.inBar': 'Trên thanh',
+  'settings.appearance.mobileNav.underMore': 'Trong “Thêm”',
+  'settings.appearance.mobileNav.moreEmpty': 'Chưa có gì ở đây — mọi mục đều vừa trên thanh.',
+  'settings.appearance.mobileNav.pinned': 'Đã ghim',
+  'settings.appearance.mobileNav.toMore': 'Chuyển vào “Thêm”',
+  'settings.appearance.mobileNav.toBar': 'Chuyển lên thanh',
+  'settings.appearance.dashOrder': 'Thứ tự bảng điều khiển',
+  'settings.appearance.dashOrder.hint':
+    'Sắp xếp lại cách danh sách chuyến đi và các tiện ích xếp chồng trên bảng điều khiển điện thoại. Chuyến đi nổi bật luôn ở trên cùng.',
+  'settings.appearance.dashOrder.trips': 'Chuyến đi',
+  'settings.appearance.dashOrder.hidden': 'Đã ẩn',
   'settings.general.languageRegion': 'Ngôn ngữ & khu vực',
   'settings.general.travelMap': 'Du lịch & bản đồ',
+  'settings.general.startup': 'Khởi động',
+  'settings.startPage': 'Trang khởi động',
+  'settings.startPageDashboard': 'Bảng điều khiển',
+  'settings.startPageActiveTrip': 'Chuyến đi đang diễn ra',
+  'settings.startPageHint':
+    'TREK mở thẳng chuyến đi đang diễn ra, nếu không thì chuyến gần nhất sắp tới. Đó cũng là chuyến mà bảng điều khiển làm nổi bật.',
+  'settings.startTripTab': 'Tab khởi động',
+  'settings.startTripTabHint':
+    'Tab mà chuyến đi mở ra. Nếu tab đó thuộc tiện ích đã tắt, chế độ xem kế hoạch sẽ mở thay thế.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': 'Bộ nhớ đệm ngoại tuyến',
@@ -496,7 +532,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': 'Thời điểm',
   'settings.pluginActivity.columns.status': 'Kết quả',
   'settings.alwaysShowRoutes': 'Luôn hiển thị tuyến đường đặt chỗ',
-  'settings.alwaysShowRoutesHint': 'Tự động hiển thị trên bản đồ tuyến đường của mỗi chuyến bay, tàu hỏa và đặt chỗ khác, không cần bật riêng từng mục.',
+  'settings.alwaysShowRoutesHint':
+    'Tự động hiển thị trên bản đồ tuyến đường của mỗi chuyến bay, tàu hỏa và đặt chỗ khác, không cần bật riêng từng mục.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'Khóa API',
+  'settings.apiKeys.description': 'Khóa cho API công khai, để phần mềm khác có thể đọc các chuyến đi của bạn. Chỉ đọc: khóa không thể thay đổi hay xóa bất cứ thứ gì.',
+  'settings.apiKeys.create': 'Tạo khóa',
+  'settings.apiKeys.empty': 'Chưa có khóa nào. Tạo một khóa để kết nối phần mềm khác.',
+  'settings.apiKeys.createdAt': 'đã tạo',
+  'settings.apiKeys.usedAt': 'dùng lần cuối',
+  'settings.apiKeys.deleteTitle': 'Xóa khóa',
+  'settings.apiKeys.deleteMessage': 'Mọi thứ đang dùng khóa này sẽ ngừng hoạt động ngay lập tức. Không thể hoàn tác.',
+  'settings.apiKeys.deleted': 'Đã xóa khóa',
+  'settings.apiKeys.deleteFailed': 'Không thể xóa khóa',
+  'settings.apiKeys.createFailed': 'Không thể tạo khóa',
+  'settings.apiKeys.copy': 'Sao chép',
+  'settings.apiKeys.docsHint': 'Gửi khóa dưới dạng "Authorization: Bearer ..." hoặc "X-API-Key: ..." tới /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Tạo khóa API',
+  'settings.apiKeys.modal.name': 'Tên',
+  'settings.apiKeys.modal.namePlaceholder': 'ví dụ Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Chỉ dành cho bạn, để nhận ra khóa này về sau.',
+  'settings.apiKeys.modal.creating': 'Đang tạo...',
+  'settings.apiKeys.modal.create': 'Tạo',
+  'settings.apiKeys.modal.createdTitle': 'Đã tạo khóa API',
+  'settings.apiKeys.modal.createdWarning': 'Hãy sao chép khóa ngay. Khóa chỉ hiện một lần và không thể lấy lại sau này.',
+  'settings.apiKeys.modal.done': 'Xong',
 };
 
 export default settings;

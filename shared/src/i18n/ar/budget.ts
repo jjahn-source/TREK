@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'حذف المصروف؟',
+  'costs.confirm.deleteBody': 'سيتم حذف "{name}" نهائيًا.',
   'budget.title': 'الميزانية',
   'budget.exportCsv': 'تصدير CSV',
   'budget.emptyTitle': 'لم يتم إنشاء ميزانية بعد',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'تراجع',
   'costs.whatFor': 'لأجل ماذا كان؟',
   'costs.namePlaceholder': 'مثل: عشاء، هدايا تذكارية، وقود…',
+  'costs.note': 'ملاحظة',
+  'costs.notePlaceholder': 'ما الذي شملته، ومن يدين بماذا…',
+  'costs.addNote': 'إضافة ملاحظة',
+  'costs.showNote': 'عرض الملاحظة',
+  'costs.hideNote': 'إخفاء الملاحظة',
   'costs.totalAmount': 'المبلغ الإجمالي',
   'costs.currency': 'العملة',
   'costs.day': 'اليوم',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'الرسوم والتذاكر',
   'costs.cat.health': 'الصحة',
   'costs.cat.tips': 'البقشيش',
+  'costs.cat.fuel': 'وقود',
+  'costs.cat.parking': 'موقف سيارات',
   'costs.cat.other': 'أخرى',
   'costs.daysCount': '{count} أيام',
   'costs.travelers': '{count} مسافرين',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'كل الفئات',
   'costs.filter.allDays': 'كل الأيام',
   'costs.expensesCount': '{count} مصروف',
+  'costs.ticketItemName': 'اسم العنصر',
+  'costs.ticketSplitting': 'التقسيم:',
+  'costs.ticketAddItem': 'إضافة عنصر',
+  'costs.ticketShares': 'حصة كل شخص',
+  'costs.excluded': 'مستبعد',
+  'costs.splitBalanced': 'التقسيم يطابق الإجمالي',
+  'costs.splitSumUnder': 'مجموع الحصص: {sum} من {total} (ناقص {diff})',
+  'costs.splitSumOver': 'مجموع الحصص: {sum} من {total} (زائد {diff})',
 };
 export default budget;

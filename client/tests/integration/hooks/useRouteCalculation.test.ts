@@ -112,7 +112,51 @@ describe('useRouteCalculation', () => {
     await act(async () => {});
 
     expect(calculateRouteWithLegs).toHaveBeenCalled();
-    expect(result.current.routeSegments).toEqual(MOCK_SEGMENTS);
+    // Each leg is now tagged with the mode it was routed in (#1281); with no
+    // per-segment override or day default, that resolves to the 'driving' default.
+    expect(result.current.routeSegments).toEqual(MOCK_SEGMENTS.map(s => ({ ...s, mode: 'driving' })));
+  });
+
+  it('FE-HOOK-ROUTE-023: consecutive legs of one mode go out as a single multi-waypoint request', async () => {
+    // Three places routed in the day default and a fourth reached on foot: two
+    // requests, not three, and the connectors stay one per pair in order.
+    (calculateRouteWithLegs as ReturnType<typeof vi.fn>).mockImplementation(
+      (waypoints: { lat: number; lng: number }[]) => Promise.resolve({
+        coordinates: [] as [number, number][],
+        distance: 0,
+        duration: 0,
+        legs: waypoints.slice(0, -1).map((w, i) => ({
+          ...MOCK_SEGMENTS[0],
+          from: [w.lat, w.lng] as [number, number],
+          to: [waypoints[i + 1].lat, waypoints[i + 1].lng] as [number, number],
+        })),
+      }),
+    );
+    const pts = [
+      { lat: 48.86, lng: 2.35 }, { lat: 48.87, lng: 2.36 },
+      { lat: 48.88, lng: 2.37 }, { lat: 48.89, lng: 2.38 },
+    ];
+    const assignments = pts.map((pt, i) => ({
+      ...buildAssignment({ day_id: 5, order_index: i, place: buildPlace(pt) }),
+      // The third place walks to the fourth; the first two use the day default.
+      leg_transport_mode: i === 2 ? 'walking' : null,
+    }));
+    const store = buildMockStore({ '5': assignments as never });
+
+    const { result } = renderHook(() => useRouteCalculation(store as TripStoreState, 5));
+    await act(async () => {});
+
+    const calls = (calculateRouteWithLegs as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0]).toEqual(pts.slice(0, 3));
+    expect(calls[0][1].profile).toBe('driving');
+    expect(calls[1][0]).toEqual(pts.slice(2));
+    expect(calls[1][1].profile).toBe('walking');
+    // One segment per pair, in the order they are walked.
+    expect(result.current.routeSegments.map(s => s.mode)).toEqual(['driving', 'driving', 'walking']);
+    expect(result.current.routeSegments.map(s => s.from)).toEqual([
+      [pts[0].lat, pts[0].lng], [pts[1].lat, pts[1].lng], [pts[2].lat, pts[2].lng],
+    ]);
   });
 
   it('FE-HOOK-ROUTE-006: assignments are sorted by order_index before extracting waypoints', async () => {
@@ -293,6 +337,94 @@ describe('useRouteCalculation', () => {
     expect(result.current.route?.[0]?.[0]).toEqual([arr.lat, arr.lng]);
     // The evening leg [last activity → hotel] is still drawn.
     expect(legs).toContainEqual([`${actB.lat},${actB.lng}`, `${hotel.lat},${hotel.lng}`]);
+  });
+
+  // #2071 — Frankfurt → Vancouver via Reykjavik, an airport place either side. The
+  // booking's position lives per LEG in metadata.legs, which this hook never read, so
+  // the flight vanished from the waypoint list and the two airports were joined into
+  // one driving run across the Atlantic.
+  it('FE-HOOK-ROUTE-024: a layover flight breaks the run instead of joining the airports', async () => {
+    const fra = { lat: 50.0379, lng: 8.5622 };
+    const kef = { lat: 63.985, lng: -22.6056 };
+    const yvr = { lat: 49.1947, lng: -123.1792 };
+    const fraPlace = buildPlace({ lat: fra.lat, lng: fra.lng });
+    const yvrPlace = buildPlace({ lat: yvr.lat, lng: yvr.lng });
+
+    const flight = {
+      id: 300, type: 'flight', day_id: 1, end_day_id: 1,
+      endpoints: [
+        { role: 'from', sequence: 0, lat: fra.lat, lng: fra.lng },
+        { role: 'stop', sequence: 1, lat: kef.lat, lng: kef.lng },
+        { role: 'to', sequence: 2, lat: yvr.lat, lng: yvr.lng },
+      ],
+      metadata: JSON.stringify({
+        legs: [
+          { from: 'FRA', to: 'KEF', dep_time: '10:00', arr_time: '12:00', day_positions: { 1: 0.5 } },
+          { from: 'KEF', to: 'YVR', dep_time: '14:00', arr_time: '16:00', day_positions: { 1: 0.6 } },
+        ],
+      }),
+    };
+    const before = buildAssignment({ day_id: 1, order_index: 0, place: fraPlace });
+    const after = buildAssignment({ day_id: 1, order_index: 1, place: yvrPlace });
+    const store = { assignments: { '1': [before, after] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }],
+    } as any);
+
+    const { result } = renderHook(() => useRouteCalculation(store, 1, true, 'driving'));
+    await act(async () => {});
+
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    // The transatlantic pair is the bug: it must not appear in any run.
+    for (const run of legs) {
+      const i = run.indexOf(`${fra.lat},${fra.lng}`);
+      if (i >= 0) expect(run[i + 1]).not.toBe(`${yvr.lat},${yvr.lng}`);
+    }
+    expect(legs).not.toContainEqual([`${fra.lat},${fra.lng}`, `${yvr.lat},${yvr.lng}`]);
+  });
+
+  // Each leg spans its OWN pair of airports. Reading the booking's outermost two for
+  // every leg put a Reykjavik stop on a Vancouver → Frankfurt drive.
+  it('FE-HOOK-ROUTE-025: a stop between two legs routes against that leg\'s airports', async () => {
+    const fra = { lat: 50.0379, lng: 8.5622 };
+    const kef = { lat: 63.985, lng: -22.6056 };
+    const yvr = { lat: 49.1947, lng: -123.1792 };
+    const cafe = buildPlace({ lat: 64.1466, lng: -21.9426 });
+
+    const flight = {
+      id: 301, type: 'flight', day_id: 1, end_day_id: 1,
+      endpoints: [
+        { role: 'from', sequence: 0, lat: fra.lat, lng: fra.lng },
+        { role: 'stop', sequence: 1, lat: kef.lat, lng: kef.lng },
+        { role: 'to', sequence: 2, lat: yvr.lat, lng: yvr.lng },
+      ],
+      metadata: JSON.stringify({
+        legs: [
+          { from: 'FRA', to: 'KEF', dep_time: '08:00', arr_time: '10:00', day_positions: { 1: 0.5 } },
+          { from: 'KEF', to: 'YVR', dep_time: '16:00', arr_time: '18:00', day_positions: { 1: 1.5 } },
+        ],
+      }),
+    };
+    const stop = buildAssignment({ day_id: 1, order_index: 1, place: cafe });
+    const store = { assignments: { '1': [stop] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }],
+    } as any);
+
+    const { result } = renderHook(() => useRouteCalculation(store, 1, true, 'driving'));
+    await act(async () => {});
+
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    // The café is reached from Reykjavik and left towards Reykjavik.
+    expect(legs).toContainEqual([`${kef.lat},${kef.lng}`, `${cafe.lat},${cafe.lng}`, `${kef.lat},${kef.lng}`]);
+    // Neither of the far airports may appear next to it.
+    const flat = legs.flat();
+    expect(flat).not.toContain(`${fra.lat},${fra.lng}`);
+    expect(flat).not.toContain(`${yvr.lat},${yvr.lng}`);
   });
 
   it('FE-HOOK-ROUTE-015: day-1 with a first activity timed after check-in keeps the hotel → first-activity leg', async () => {
@@ -542,5 +674,135 @@ describe('useRouteCalculation', () => {
     // Before the fix this produced a bogus [flight1.arrival → flight2.departure] leg.
     expect(result.current.route).toBeNull();
     expect(result.current.routeSegments).toEqual([]);
+  });
+
+  it('FE-HOOK-ROUTE-026: an overnight flight draws no departure-airport → hotel leg (#2133)', async () => {
+    // The reporter's literal repro: add a flight on a day, add an accommodation that
+    // checks in tonight. The flight leaves today and lands tomorrow, so the day
+    // contributes ONLY its departure airport — and that airport was being joined to
+    // the hotel by a straight line, as if you had driven back from it after taking off.
+    const icn = { lat: 37.46, lng: 126.44 };   // Seoul Incheon
+    const hotel = { lat: 21.28, lng: -157.83 }; // Waikiki
+    const flight = {
+      id: 300, type: 'flight', day_id: 1, end_day_id: 2, day_positions: { 1: 0 },
+      endpoints: [
+        { role: 'from', lat: icn.lat, lng: icn.lng },
+        { role: 'to', lat: 21.32, lng: -157.92 },
+      ],
+    };
+    const accommodations = [{ id: 1, start_day_id: 1, end_day_id: 3, place_lat: hotel.lat, place_lng: hotel.lng }];
+    const store = { assignments: { '1': [] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }, { id: 2, day_number: 2 }, { id: 3, day_number: 3 }],
+    } as any);
+
+    const { result } = renderHook(() =>
+      useRouteCalculation(store, 1, true, 'driving', accommodations as any)
+    );
+    await act(async () => {});
+
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    expect(legs).not.toContainEqual([`${icn.lat},${icn.lng}`, `${hotel.lat},${hotel.lng}`]);
+    expect(legs).toEqual([]);
+  });
+
+  it('FE-HOOK-ROUTE-027: a far-away airport is never stapled to the local stops of a day (#2133)', async () => {
+    // The screenshot: a Honolulu day with local stops and an inbound long-haul whose
+    // DEPARTURE clock (18:30 in Seoul) sorts it after them. Its Seoul departure airport
+    // was being appended to the run of Waikiki stops, and the road router answers that
+    // pair with NoRoute, so the whole run fell back to one straight trans-Pacific line.
+    const waikiki = buildPlace({ lat: 21.28, lng: -157.83, place_time: '12:00' });
+    const diamond = buildPlace({ lat: 21.26, lng: -157.80, place_time: '15:00' });
+    const icn = { lat: 37.46, lng: 126.44 };
+    const hnl = { lat: 21.32, lng: -157.92 };
+    const a1 = buildAssignment({ day_id: 1, order_index: 0, place: waikiki });
+    const a2 = buildAssignment({ day_id: 1, order_index: 1, place: diamond });
+    const flight = {
+      id: 301, type: 'flight', day_id: 1, end_day_id: 1, reservation_time: '18:30',
+      endpoints: [
+        { role: 'from', lat: icn.lat, lng: icn.lng },
+        { role: 'to', lat: hnl.lat, lng: hnl.lng },
+      ],
+    };
+    const store = { assignments: { '1': [a1, a2] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }],
+    } as any);
+
+    const { result } = renderHook(() =>
+      useRouteCalculation(store, 1, true, 'driving')
+    );
+    await act(async () => {});
+
+    const flat = (result.current.route ?? []).flat().map(p => `${p[0]},${p[1]}`);
+    // Seoul never appears in a driving run drawn over Oahu.
+    expect(flat).not.toContain(`${icn.lat},${icn.lng}`);
+    // The genuine local drive between the two Waikiki stops survives.
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    expect(legs).toContainEqual([`${waikiki.lat},${waikiki.lng}`, `${diamond.lat},${diamond.lng}`]);
+  });
+
+  it('FE-HOOK-ROUTE-028: a hire car pickup still draws its leg to the hotel tonight (#2133)', async () => {
+    // The counter-case the fix must not eat. A multi-day rental contributes only its
+    // PICKUP point on the collection day — the same "one endpoint" shape as the
+    // overnight flight above — but you keep driving the car, so the drive from the
+    // depot to tonight's hotel is real and must stay.
+    const depot = { lat: 48.35, lng: 11.78 };   // Munich airport depot
+    const hotel = { lat: 48.14, lng: 11.58 };   // Munich city hotel
+    const rental = {
+      id: 302, type: 'car', day_id: 1, end_day_id: 3, day_positions: { 1: 0 },
+      endpoints: [
+        { role: 'from', lat: depot.lat, lng: depot.lng },
+        { role: 'to', lat: 52.5, lng: 13.4 },
+      ],
+    };
+    const accommodations = [{ id: 1, start_day_id: 1, end_day_id: 3, place_lat: hotel.lat, place_lng: hotel.lng }];
+    const store = { assignments: { '1': [] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [rental],
+      days: [{ id: 1, day_number: 1 }, { id: 2, day_number: 2 }, { id: 3, day_number: 3 }],
+    } as any);
+
+    const { result } = renderHook(() =>
+      useRouteCalculation(store, 1, true, 'driving', accommodations as any)
+    );
+    await act(async () => {});
+
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    expect(legs).toContainEqual([`${depot.lat},${depot.lng}`, `${hotel.lat},${hotel.lng}`]);
+  });
+
+  it('FE-HOOK-ROUTE-029: you still drive from the hotel to your outbound airport (#2133)', async () => {
+    // The legitimate morning mirror. A same-day flight contributes both endpoints, so
+    // the day opens on its DEPARTURE airport — a drive you really make.
+    const hotel = { lat: 48.14, lng: 11.58 };
+    const muc = { lat: 48.35, lng: 11.78 };
+    const flight = {
+      id: 303, type: 'flight', day_id: 3, end_day_id: 3, day_positions: { 3: 0 },
+      endpoints: [
+        { role: 'from', lat: muc.lat, lng: muc.lng },
+        { role: 'to', lat: 41.80, lng: 12.25 },
+      ],
+    };
+    const accommodations = [{ id: 1, start_day_id: 1, end_day_id: 3, place_lat: hotel.lat, place_lng: hotel.lng }];
+    const store = { assignments: { '3': [] } } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: store.assignments,
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }, { id: 2, day_number: 2 }, { id: 3, day_number: 3 }],
+    } as any);
+
+    const { result } = renderHook(() =>
+      useRouteCalculation(store, 3, true, 'driving', accommodations as any)
+    );
+    await act(async () => {});
+
+    const legs = (result.current.route ?? []).map(run => run.map(p => `${p[0]},${p[1]}`));
+    expect(legs).toContainEqual([`${hotel.lat},${hotel.lng}`, `${muc.lat},${muc.lng}`]);
   });
 });

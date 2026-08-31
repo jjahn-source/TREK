@@ -166,6 +166,25 @@ describe('shouldDrawMorningLeg', () => {
     expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: true, time: '06:00' })).toBe(true)
   })
 
+  it('does NOT draw when the day opens on an airport you landed at (#2133)', () => {
+    // You flew in. Even on a night you provably slept in this hotel, nobody drove out
+    // of it to the airport that set you down.
+    const bookends = { morning: into(), morningIsSleptHere: true }
+    expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: false, carrierEdge: 'arrival' })).toBe(false)
+  })
+
+  it('still draws when the day opens on an airport you departed from (#2133)', () => {
+    // The legitimate mirror: you woke in the hotel and drove to your outbound airport.
+    const bookends = { morning: into(), morningIsSleptHere: true }
+    expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: false, carrierEdge: 'departure' })).toBe(true)
+  })
+
+  it('still draws for a hire-car drop-off point, which carries no carrierEdge (#2133)', () => {
+    // A car you keep driving is not a carrier: the hotel → drop-off depot drive is real.
+    const bookends = { morning: into(), morningIsSleptHere: true }
+    expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: false, carrierEdge: null })).toBe(true)
+  })
+
   it('does NOT draw on a check-in day when the first place is before check-in (#1465)', () => {
     const bookends = { morning: into({ check_in: '15:00' }), morningIsSleptHere: false }
     // Airport place at 10:00, check-in 15:00 — you have not reached the hotel yet.
@@ -178,13 +197,21 @@ describe('shouldDrawMorningLeg', () => {
     expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: true, time: '15:00' })).toBe(true)
   })
 
-  it('does NOT draw on a check-in day when time info is missing (#1597)', () => {
+  it('does NOT draw on a check-in day when the stop is untimed but check-in is not (#1597)', () => {
     // An un-timed first place on an arrival day ("Home" before driving out) cannot prove
     // you were at the hotel yet, so no hotel → first-stop leg — mirroring the evening rule.
     const bookends = { morning: into({ check_in: '15:00' }), morningIsSleptHere: false }
     expect(shouldDrawMorningLeg(bookends, checkInDay, { isPlace: true, time: null })).toBe(false)
+  })
+
+  it('DOES draw on a check-in day when the stay records no check-in time (#2009)', () => {
+    // Nothing to clear, so nothing to fail: the hotel picker leaves the time blank
+    // by default, and treating that as proof against left the loop open every time.
     const noCheckIn = { morning: into({ check_in: null }), morningIsSleptHere: false }
-    expect(shouldDrawMorningLeg(noCheckIn, checkInDay, { isPlace: true, time: '19:00' })).toBe(false)
+    expect(shouldDrawMorningLeg(noCheckIn, checkInDay, { isPlace: true, time: '19:00' })).toBe(true)
+    expect(shouldDrawMorningLeg(noCheckIn, checkInDay, { isPlace: true, time: null })).toBe(true)
+    // A transport arrival is still not a hotel departure (#1321).
+    expect(shouldDrawMorningLeg(noCheckIn, checkInDay, { isPlace: false, time: '19:00' })).toBe(false)
   })
 
   it('does NOT draw on a check-in day for a transport arrival (not a place, #1321)', () => {
@@ -210,6 +237,25 @@ describe('shouldDrawEveningLeg', () => {
     expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: true, time: '23:00' })).toBe(true)
   })
 
+  it('does NOT draw when the day ends at an airport you took off from (#2133)', () => {
+    // The reported bug: an overnight flight leaves only its departure airport on the
+    // day it leaves, and that airport was being joined to tonight's hotel.
+    const bookends = { evening: out(), eveningIsOvernight: true }
+    expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: false, carrierEdge: 'departure' })).toBe(false)
+  })
+
+  it('still draws when the day ends at an airport you landed at (#2133)', () => {
+    // The legitimate case the fix must not eat: you land, then drive to the hotel.
+    const bookends = { evening: out(), eveningIsOvernight: true }
+    expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: false, carrierEdge: 'arrival' })).toBe(true)
+  })
+
+  it('still draws for a hire-car pickup point, which carries no carrierEdge (#2133)', () => {
+    // You collect the car at 18:00 and drive it to tonight's hotel — a real leg.
+    const bookends = { evening: out(), eveningIsOvernight: true }
+    expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: false, carrierEdge: null })).toBe(true)
+  })
+
   it('does NOT draw on a check-out day when the last place is after check-out (#1465)', () => {
     const bookends = { evening: out({ check_out: '11:00' }), eveningIsOvernight: false }
     // "home" place at 18:00, check-out 11:00 — you have already left the hotel.
@@ -222,11 +268,17 @@ describe('shouldDrawEveningLeg', () => {
     expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: true, time: '11:00' })).toBe(true)
   })
 
-  it('does NOT draw on a check-out day when the place or hotel has no time', () => {
+  it('does NOT draw on a check-out day when the stop is untimed but check-out is not', () => {
     const bookends = { evening: out({ check_out: '11:00' }), eveningIsOvernight: false }
     expect(shouldDrawEveningLeg(bookends, checkOutDay, { isPlace: true, time: null })).toBe(false)
+  })
+
+  it('DOES draw on a check-out day when the stay records no check-out time (#2009)', () => {
     const noCheckOut = { evening: out({ check_out: null }), eveningIsOvernight: false }
-    expect(shouldDrawEveningLeg(noCheckOut, checkOutDay, { isPlace: true, time: '09:00' })).toBe(false)
+    expect(shouldDrawEveningLeg(noCheckOut, checkOutDay, { isPlace: true, time: '09:00' })).toBe(true)
+    expect(shouldDrawEveningLeg(noCheckOut, checkOutDay, { isPlace: true, time: null })).toBe(true)
+    // An evening transport departure is still not a drive back to the hotel (S7).
+    expect(shouldDrawEveningLeg(noCheckOut, checkOutDay, { isPlace: false, time: '09:00' })).toBe(false)
   })
 
   it('does NOT draw on a check-out day for a transport departure (not a place, S7)', () => {

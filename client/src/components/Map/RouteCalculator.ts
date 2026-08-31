@@ -1,4 +1,5 @@
 import { useSettingsStore } from '../../store/settingsStore'
+import { pluginsApi } from '../../api/client'
 import type { DistanceUnit, RouteResult, RouteSegment, RouteWithLegs, Waypoint, RouteAnchors } from '../../types'
 import { formatDistance } from '../../utils/units'
 
@@ -17,6 +18,21 @@ const OSRM_PROFILE_BASE: Record<'driving' | 'walking' | 'cycling', string> = {
 // this avoids re-hitting the public OSRM demo server on every day switch / reorder.
 const routeCache = new Map<string, RouteWithLegs>()
 const ROUTE_CACHE_MAX = 200
+
+/**
+ * A route profile is either one of the built-in OSRM profiles or a plugin profile
+ * key `plugin:<pluginId>/<profileId>` — the route toggle offers those for every
+ * active routeProvider plugin, and calculateRouteWithLegs dispatches on the prefix.
+ */
+export type RouteProfileKey = 'driving' | 'walking' | 'cycling' | (string & {})
+
+export function parsePluginProfile(profile: string): { pluginId: string; profileId: string } | null {
+  if (!profile.startsWith('plugin:')) return null
+  const rest = profile.slice('plugin:'.length)
+  const slash = rest.indexOf('/')
+  if (slash <= 0 || slash === rest.length - 1) return null
+  return { pluginId: rest.slice(0, slash), profileId: rest.slice(slash + 1) }
+}
 
 /** Fetches a full route via OSRM and returns coordinates, distance, and duration estimates for driving/walking. */
 export async function calculateRoute(
@@ -76,14 +92,14 @@ export async function calculateRoute(
  * hotel and the first/last located waypoint exist; passing nulls leaves `runs`
  * untouched. The shared first/last waypoint is repeated so the polylines join.
  */
-export function withHotelBookends(
-  runs: Waypoint[][],
-  firstWay: Waypoint | undefined,
-  lastWay: Waypoint | undefined,
-  startHotel: Waypoint | null,
-  endHotel: Waypoint | null,
-): Waypoint[][] {
-  const out: Waypoint[][] = []
+export function withHotelBookends<T extends { lat: number; lng: number }>(
+  runs: T[][],
+  firstWay: T | undefined,
+  lastWay: T | undefined,
+  startHotel: T | null,
+  endHotel: T | null,
+): T[][] {
+  const out: T[][] = []
   if (startHotel && firstWay) out.push([startHotel, firstWay])
   out.push(...runs)
   if (endHotel && lastWay) out.push([lastWay, endHotel])
@@ -98,6 +114,42 @@ export function generateGoogleMapsUrl(places: Waypoint[]): string | null {
   }
   const stops = valid.map((p) => `${p.lat},${p.lng}`).join('/')
   return `https://www.google.com/maps/dir/${stops}`
+}
+
+/** A stop that can carry its name into a deep link that has somewhere to put one. */
+export type NamedWaypoint = Waypoint & { name?: string | null }
+
+/** TREK's route profiles in CoMaps' vocabulary; a plugin profile has no equivalent and drives. */
+function coMapsRouteType(profile: RouteProfileKey): string {
+  if (profile === 'walking') return 'pedestrian'
+  if (profile === 'cycling') return 'bicycle'
+  return 'vehicle'
+}
+
+/**
+ * Open a day's stops in CoMaps for offline navigation (#1904).
+ *
+ * CoMaps has two links and they trade against each other. `route` builds real
+ * turn-by-turn in the given travel mode but takes a start and a destination and
+ * nothing between them; `map` takes any number of named pins but routes nothing.
+ * So a two-stop day goes as a route — everything it has fits, mode included —
+ * and a longer one goes as pins, because handing over the whole day and letting
+ * CoMaps route leg by leg beats quietly dropping the middle of someone's plan.
+ * A day that needs the full itinerary as one navigable track has the GPX export.
+ *
+ * https rather than `cm://` for the same reason as `getCoMapsUrlForPlace`.
+ */
+export function generateCoMapsUrl(places: NamedWaypoint[], profile: RouteProfileKey = 'driving'): string | null {
+  const valid = places.filter((p) => p.lat != null && p.lng != null)
+  if (valid.length === 0) return null
+  const label = (p: NamedWaypoint) => encodeURIComponent(p.name?.trim() || `${p.lat},${p.lng}`)
+  if (valid.length === 2) {
+    const [from, to] = valid
+    return `https://comaps.at/route?sll=${from.lat},${from.lng}&saddr=${label(from)}`
+      + `&dll=${to.lat},${to.lng}&daddr=${label(to)}&type=${coMapsRouteType(profile)}`
+  }
+  const pins = valid.map((p) => `ll=${p.lat},${p.lng}&n=${label(p)}`).join('&')
+  return `https://comaps.at/map?v=1&${pins}`
 }
 
 // Squared planar distance — enough for nearest-neighbor comparisons and cheaper than a full haversine.
@@ -233,7 +285,7 @@ export async function calculateSegments(
  */
 export async function calculateRouteWithLegs(
   waypoints: Waypoint[],
-  { signal, profile = 'driving' }: { signal?: AbortSignal; profile?: 'driving' | 'walking' | 'cycling' } = {}
+  { signal, profile = 'driving', tripId, dayId }: { signal?: AbortSignal; profile?: RouteProfileKey; tripId?: number | string | null; dayId?: number | null } = {}
 ): Promise<RouteWithLegs> {
   if (!waypoints || waypoints.length < 2) {
     return { coordinates: [], distance: 0, duration: 0, legs: [] }
@@ -242,11 +294,58 @@ export async function calculateRouteWithLegs(
   const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';')
   // The cached result carries formatted leg distances, so the active distance unit is
   // part of the key — otherwise switching km↔mi would return stale text (#1300).
-  const cacheKey = `${profile}:${getDistanceUnit()}:${coords}`
+  // A plugin route is trip-/day-specific (it may return different charging stops for
+  // the same coordinates on a different day), so its key includes tripId/dayId;
+  // the built-in OSRM profiles are context-free and leave those out.
+  const pluginScope = profile.startsWith('plugin:') ? `:${tripId ?? ''}:${dayId ?? ''}` : ''
+  const cacheKey = `${profile}:${getDistanceUnit()}:${coords}${pluginScope}`
   const cached = routeCache.get(cacheKey)
   if (cached) return cached
 
-  const url = `${OSRM_PROFILE_BASE[profile]}/${coords}?overview=full&geometries=geojson&annotations=distance,duration`
+  // Plugin profile (`plugin:<id>/<profile>`): the server invokes that routeProvider
+  // and normalizes its answer; null means the provider failed or refused, and the
+  // throw makes callers fall back to straight lines exactly like an OSRM outage.
+  const pluginProfile = parsePluginProfile(profile)
+  if (pluginProfile) {
+    if (tripId == null) throw new Error('Plugin routing needs a trip context')
+    const { route } = await pluginsApi.pluginRoute(pluginProfile.pluginId, pluginProfile.profileId, {
+      tripId,
+      dayId: dayId ?? null,
+      waypoints: waypoints.map((p) => ({ lat: p.lat, lng: p.lng })),
+    }, { signal })
+    if (!route) throw new Error('No route found')
+    const legs: RouteSegment[] = route.legs.map((leg, i): RouteSegment => {
+      const from: [number, number] = [waypoints[i].lat, waypoints[i].lng]
+      const to: [number, number] = [waypoints[i + 1].lat, waypoints[i + 1].lng]
+      const mid: [number, number] = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2]
+      return {
+        mid, from, to,
+        distance: leg.distance,
+        duration: leg.duration,
+        walkingText: formatDuration(leg.distance / (5000 / 3600)),
+        drivingText: formatDuration(leg.duration),
+        distanceText: formatRouteDistance(leg.distance),
+        durationText: formatDuration(leg.duration),
+        ...(leg.note ? { noteText: leg.note } : {}),
+      }
+    })
+    const result: RouteWithLegs = {
+      coordinates: route.coordinates,
+      distance: route.distance,
+      duration: route.duration,
+      legs,
+      ...(route.viaPoints.length ? { vias: route.viaPoints } : {}),
+    }
+    routeCache.set(cacheKey, result)
+    if (routeCache.size > ROUTE_CACHE_MAX) {
+      const oldest = routeCache.keys().next().value
+      if (oldest !== undefined) routeCache.delete(oldest)
+    }
+    return result
+  }
+
+  const osrmProfile = (profile === 'walking' || profile === 'cycling') ? profile : 'driving'
+  const url = `${OSRM_PROFILE_BASE[osrmProfile]}/${coords}?overview=full&geometries=geojson&annotations=distance,duration`
   const response = await fetch(url, { signal })
   if (!response.ok) throw new Error('Route could not be calculated')
 

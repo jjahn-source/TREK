@@ -13,6 +13,8 @@ const inspector: TranslationStrings = {
   'inspector.confirmedRes': 'Επιβεβαιωμένη Κράτηση',
   'inspector.pendingRes': 'Εκκρεμής Κράτηση',
   'inspector.google': 'Google Maps',
+  'inspector.navigation': 'Πλοήγηση',
+  'inspector.openWith': 'Άνοιγμα με',
   'inspector.openStreetMap': 'OpenStreetMap',
   'inspector.saveToCollection': 'Αποθήκευση στη Συλλογή',
   'inspector.savedToCollection': 'Αποθηκεύτηκε',
@@ -21,5 +23,8 @@ const inspector: TranslationStrings = {
   'inspector.editRes': 'Επεξεργασία Κράτησης',
   'inspector.participants': 'Συμμετέχοντες',
   'inspector.trackStats': 'Στατιστικά Διαδρομής',
+  'inspector.trackColor': 'Χρώμα διαδρομής',
+  'inspector.trackColorAuto': 'Αυτόματο χρώμα',
+  'inspector.trackColorCustom': 'Επιλογή προσαρμοσμένου χρώματος',
 };
 export default inspector;

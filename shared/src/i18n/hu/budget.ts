@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Törlöd a kiadást?',
+  'costs.confirm.deleteBody': 'A(z) „{name}” véglegesen törlődik.',
   'budget.title': 'Költségvetés',
   'budget.exportCsv': 'CSV exportálás',
   'budget.emptyTitle': 'Még nincs költségvetés létrehozva',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Visszavonás',
   'costs.whatFor': 'Mire volt?',
   'costs.namePlaceholder': 'pl. vacsora, ajándékok, benzin…',
+  'costs.note': 'Megjegyzés',
+  'costs.notePlaceholder': 'Mit fedezett, ki tartozik mivel…',
+  'costs.addNote': 'Megjegyzés hozzáadása',
+  'costs.showNote': 'Megjegyzés megjelenítése',
+  'costs.hideNote': 'Megjegyzés elrejtése',
   'costs.totalAmount': 'Teljes összeg',
   'costs.currency': 'Pénznem',
   'costs.day': 'Nap',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Díjak és jegyek',
   'costs.cat.health': 'Egészség',
   'costs.cat.tips': 'Borravaló',
+  'costs.cat.fuel': 'Üzemanyag',
+  'costs.cat.parking': 'Parkolás',
   'costs.cat.other': 'Egyéb',
   'costs.daysCount': '{count} nap',
   'costs.travelers': '{count} utazó',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Összes kategória',
   'costs.filter.allDays': 'Összes nap',
   'costs.expensesCount': '{count} kiadás',
+  'costs.ticketItemName': 'Tétel neve',
+  'costs.ticketSplitting': 'Megosztva:',
+  'costs.ticketAddItem': 'Tétel hozzáadása',
+  'costs.ticketShares': 'Egyéni részek',
+  'costs.excluded': 'Kihagyva',
+  'costs.splitBalanced': 'A felosztás megegyezik a végösszeggel',
+  'costs.splitSumUnder': 'A részek összege: {sum} / {total} (hiányzik {diff})',
+  'costs.splitSumOver': 'A részek összege: {sum} / {total} ({diff} a többlet)',
 };
 export default budget;

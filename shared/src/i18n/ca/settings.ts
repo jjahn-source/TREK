@@ -14,7 +14,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Plantilla del mapa',
   'settings.mapTemplatePlaceholder.select': 'Selecciona una plantilla...',
   'settings.mapDefaultHint': 'Deixa-ho buit per a OpenStreetMap (per defecte)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': "Plantilla d'URL per als mosaics del mapa",
   'settings.mapProvider': 'Proveïdor de mapa',
   'settings.mapProviderHint': 'Afecta els mapes de Trip Planner i Journey. Atles sempre utilitza Leaflet.',
@@ -24,6 +23,12 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': "Token d'accés de Mapbox",
   'settings.mapMapboxTokenHint': 'Token públic (pk.*) de',
   'settings.mapMapboxTokenLink': "mapbox.com → Tokens d'accés",
+  'settings.mapCartoKey': "Clau d'API de CARTO",
+  'settings.mapCartoKeyHint':
+    "Els mapes base de CARTO mostren una marca d'aigua sense clau. Gratuïta i sense compte, des de",
+  'settings.mapCartoKeyLink': "clau d'API de mapes base de carto.com",
+  'settings.mapCartoKeyMissing':
+    'Aquesta plantilla és un mapa base de CARTO. Sense clau, CARTO estampa "API KEY REQUIRED" a cada tessel·la. Mentre no hi hagi clau, TREK mostra el mapa base per defecte.',
   'settings.mapStyle': 'Estil de mapa',
   'settings.mapStylePlaceholder': 'Selecciona un estil de Mapbox',
   'settings.mapStyleHint': 'Predefinit o la teva pròpia URL mapbox://styles/USUARI/ID',
@@ -63,6 +68,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Recordatoris de viatge',
   'settings.notifyTodoDue': 'Tasca propera',
   'settings.notifyVacayInvite': 'Invitacions de fusió Vacay',
+  'settings.notifyVacayShare': 'Comparticions de calendari Vacay',
   'settings.notifyPhotosShared': 'Fotos compartides (Immich)',
   'settings.notifyCollabMessage': 'Missatges de xat (Col·laboració)',
   'settings.notifyPackingTagged': "Llista d'equipatge: assignacions",
@@ -166,6 +172,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Sol·licita una funció',
   'settings.about.featureRequestHint': 'Suggereix una funció nova',
   'settings.about.wikiHint': 'Documentació i guies',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Patrocinadors Mensuals',
   'settings.about.supporters.title': 'Companyia de viatge per a TREK',
   'settings.about.supporters.subtitle':
@@ -242,6 +252,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Foto de perfil actualitzada',
   'settings.avatarRemoved': 'Foto de perfil eliminada',
   'settings.avatarError': 'La pujada ha fallat',
+  'settings.avatarRemoveError': "L'eliminació ha fallat",
   'settings.bookingLabels': 'Etiquetes de rutes de reserves',
   'settings.bookingLabelsHint': "Mostra noms d'estacions / aeroports al mapa. Desactivat, només es mostra la icona.",
   'settings.currentPasswordRequired': 'La contrasenya actual és obligatòria',
@@ -309,8 +320,9 @@ const settings: TranslationStrings = {
   'settings.aiAlwaysRetry': 'Reintentar sempre les importacions de reserves com a IA',
   'settings.aiAlwaysRetryHint':
     'Quan el lector estàndard no pugui llegir un fitxer, reintenta-ho automàticament amb IA.',
-  'settings.currency': 'Divisa',
-  'settings.currencyHint': 'Tots els imports de Despeses es converteixen i es mostren en aquesta divisa.',
+  'settings.currency': 'Divisa de visualització',
+  'settings.currencyHint':
+    'Els imports a Despeses es mostren convertits a aquesta divisa només per a la visualització — els imports originals no es modifiquen.',
   'settings.airtrail.title': 'AirTrail',
   'settings.airtrail.hint': "Connecta't a la teva instància d'AirTrail per importar vols automàticament.",
   'settings.airtrail.url': 'URL de la instància',
@@ -335,6 +347,8 @@ const settings: TranslationStrings = {
   'settings.aiParsing.providerLocal': 'Local (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    "Un punt final local (Ollama) es configura una sola vegada per a tota la instància a la configuració d'administració. Aquí encara pots fer servir la teva pròpia clau d'OpenAI o d'Anthropic.",
   'settings.aiParsing.model': 'Model',
   'settings.aiParsing.baseUrl': 'URL base',
   'settings.aiParsing.baseUrlHint':
@@ -411,8 +425,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Noms de llocs, descripcions',
   'settings.appearance.example.small': 'Adreces, etiquetes',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Barra de navegació inferior',
+  'settings.appearance.mobileNav.hint':
+    'Tria quins elements apareixen a la barra i quins queden sota «Més». El tauler sempre queda primer.',
+  'settings.appearance.mobileNav.inBar': 'A la barra',
+  'settings.appearance.mobileNav.underMore': 'Sota «Més»',
+  'settings.appearance.mobileNav.moreEmpty': 'Encara no hi ha res — tot cap a la barra.',
+  'settings.appearance.mobileNav.pinned': 'Fixat',
+  'settings.appearance.mobileNav.toMore': 'Mou-ho sota «Més»',
+  'settings.appearance.mobileNav.toBar': 'Mou-ho a la barra',
+  'settings.appearance.dashOrder': 'Ordre del tauler',
+  'settings.appearance.dashOrder.hint':
+    'Reordena com s’apilen la llista de viatges i els ginys al tauler del mòbil. El viatge destacat sempre es manté a dalt.',
+  'settings.appearance.dashOrder.trips': 'Viatges',
+  'settings.appearance.dashOrder.hidden': 'Ocult',
   'settings.general.languageRegion': 'Idioma i regió',
   'settings.general.travelMap': 'Viatge i mapa',
+  'settings.general.startup': 'Inici',
+  'settings.startPage': "Pàgina d'inici",
+  'settings.startPageDashboard': 'Tauler',
+  'settings.startPageActiveTrip': 'Viatge actiu',
+  'settings.startPageHint':
+    'TREK obre directament el viatge que està en curs, o el següent que comença. És el mateix viatge que destaca el tauler.',
+  'settings.startTripTab': "Pestanya d'inici",
+  'settings.startTripTabHint':
+    "La pestanya amb què s'obre el viatge. Si pertany a un complement desactivat, s'obre la vista de planificació.",
   'settings.offline.cache.title': 'Memòria cau fora de línia',
   'settings.offline.mode.title': 'Mode fora de línia',
   'settings.offline.mode.force': 'Forçar mode fora de línia',
@@ -498,6 +535,30 @@ const settings: TranslationStrings = {
   'settings.alwaysShowRoutes': 'Mostra sempre les rutes de reserva',
   'settings.alwaysShowRoutesHint':
     'Dibuixa automàticament al mapa la ruta de cada vol, tren i altra reserva — no cal activar-la una per una.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'Claus API',
+  'settings.apiKeys.description': 'Claus per a l\'API pública, perquè altres programes puguin llegir els teus viatges. Només lectura: una clau no pot canviar ni esborrar res.',
+  'settings.apiKeys.create': 'Crea una clau',
+  'settings.apiKeys.empty': 'Encara no hi ha claus. Crea\'n una per connectar altres programes.',
+  'settings.apiKeys.createdAt': 'creada',
+  'settings.apiKeys.usedAt': 'últim ús',
+  'settings.apiKeys.deleteTitle': 'Elimina la clau',
+  'settings.apiKeys.deleteMessage': 'Tot el que faci servir aquesta clau deixarà de funcionar immediatament. Això no es pot desfer.',
+  'settings.apiKeys.deleted': 'Clau eliminada',
+  'settings.apiKeys.deleteFailed': 'No s\'ha pogut eliminar la clau',
+  'settings.apiKeys.createFailed': 'No s\'ha pogut crear la clau',
+  'settings.apiKeys.copy': 'Copia',
+  'settings.apiKeys.docsHint': 'Envia la clau com a "Authorization: Bearer ..." o "X-API-Key: ..." a /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Crea una clau API',
+  'settings.apiKeys.modal.name': 'Nom',
+  'settings.apiKeys.modal.namePlaceholder': 'p. ex. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Només per a tu, perquè reconeguis la clau més endavant.',
+  'settings.apiKeys.modal.creating': 'S\'està creant...',
+  'settings.apiKeys.modal.create': 'Crea',
+  'settings.apiKeys.modal.createdTitle': 'Clau API creada',
+  'settings.apiKeys.modal.createdWarning': 'Copia la clau ara. Només es mostra un cop i no es pot recuperar després.',
+  'settings.apiKeys.modal.done': 'Fet',
 };
 
 export default settings;

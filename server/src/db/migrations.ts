@@ -1,4 +1,5 @@
-import { encrypt_api_key } from '../services/apiKeyCrypto';
+import { readEnv } from '../app-config';
+import { encrypt_api_key } from '../nest/common/crypto/apiKeyCrypto';
 
 import Database from 'better-sqlite3';
 import fs from 'fs';
@@ -2720,7 +2721,9 @@ function runMigrations(db: Database.Database): void {
         `CREATE TABLE IF NOT EXISTS migrations (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, timestamp bigint NOT NULL, name varchar NOT NULL);`,
       );
       db.exec(`INSERT INTO migrations (timestamp, name) VALUES (1777810195344, 'InitialSchema1777810195344');`);
-      db.exec(`INSERT INTO app_settings (key, value) VALUES ('app_version', '${process.env.APP_VERSION || '3.0.14'}')`);
+      db.prepare("INSERT INTO app_settings (key, value) VALUES ('app_version', ?)").run(
+        readEnv().app.appVersion || '3.0.14',
+      );
     },
     // trim leading/trailing whitespace from stored usernames and emails
     () => {
@@ -2738,7 +2741,9 @@ function runMigrations(db: Database.Database): void {
       db.exec(`INSERT INTO schema_version_new (version) SELECT version FROM schema_version`);
       db.exec(`DROP TABLE schema_version`);
       db.exec(`ALTER TABLE schema_version_new RENAME TO schema_version`);
-      db.exec(`UPDATE app_settings SET value = '${process.env.APP_VERSION || '3.0.15'}' WHERE key = 'app_version'`);
+      db.prepare("UPDATE app_settings SET value = ? WHERE key = 'app_version'").run(
+        readEnv().app.appVersion || '3.0.15',
+      );
     },
     // Migration: OAuth 2.0 client_credentials grant — allow user-owned confidential
     // clients to skip the browser consent flow entirely and obtain tokens directly
@@ -3701,6 +3706,476 @@ function runMigrations(db: Database.Database): void {
       `);
       db.exec('CREATE INDEX IF NOT EXISTS idx_hidden_regions_user ON hidden_regions (user_id);');
     },
+    // Half vacation days (#552): a vacay entry can now count as a full day (1) or
+    // a half day (0.5) toward the entitlement. Existing entries default to a full
+    // day, so the entitlement maths are unchanged for everyone already using vacay.
+    // Guarded so re-running the migration tail (e.g. the crosswalk test) is a no-op.
+    () => {
+      const hasFraction = db.prepare("SELECT 1 FROM pragma_table_info('vacay_entries') WHERE name = 'fraction'").get();
+      if (!hasFraction) db.exec('ALTER TABLE vacay_entries ADD COLUMN fraction REAL NOT NULL DEFAULT 1');
+    },
+    // Read-only vacay calendar sharing (#444/#667): a user can let other users
+    // view their vacation calendar without fusing plans. owner_id is the sharing
+    // user, user_id the viewer; hidden lets the viewer hide the overlay without
+    // removing the share. Follows the person, not the plan, so it survives
+    // fusion and dissolution.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS vacay_shares (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          hidden INTEGER NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (owner_id, user_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_vacay_shares_user ON vacay_shares (user_id);');
+    },
+    // Collaborative place ratings (#1435): every trip member can rate a trip
+    // place 1-5, every collection member a saved place; the displayed value is
+    // the average. One row per user and place, mirroring collab_poll_votes.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS place_ratings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          place_id INTEGER NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          rating INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(place_id, user_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_place_ratings_place ON place_ratings (place_id);');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS collection_place_ratings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          collection_place_id INTEGER NOT NULL REFERENCES collection_places(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          rating INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(collection_place_id, user_id)
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_collection_place_ratings_place ON collection_place_ratings (collection_place_id);');
+    },
+    // Per-segment travel mode (#1281): the day-plan route can use a different
+    // transport mode for each leg. leg_transport_mode on an assignment is the mode
+    // of the leg LEAVING that stop (NULL = inherit the day default); days gains a
+    // persisted default_transport_mode so the whole-day choice survives a reload.
+    // Both nullable → existing itineraries keep today's single-mode behaviour.
+    () => {
+      try {
+        db.exec('ALTER TABLE day_assignments ADD COLUMN leg_transport_mode TEXT');
+      } catch (err: any) {
+        if (!err.message?.includes('duplicate column name')) throw err;
+      }
+      try {
+        db.exec('ALTER TABLE days ADD COLUMN default_transport_mode TEXT');
+      } catch (err: any) {
+        if (!err.message?.includes('duplicate column name')) throw err;
+      }
+    },
+    // School holidays are a visual Vacay calendar layer. Keep them separate from
+    // public holidays so applyHolidayCalendars never removes vacation entries for
+    // school-break dates. Appended LAST: this branch was cut before #1435/#1281
+    // landed on dev, so an existing DB is already past their slots — only a
+    // trailing migration re-runs on upgrade and actually adds these columns.
+    () => {
+      const planCols = db.prepare("PRAGMA table_info('vacay_plans')").all() as Array<{ name: string }>;
+      if (!planCols.some(col => col.name === 'school_holidays_enabled')) {
+        db.exec('ALTER TABLE vacay_plans ADD COLUMN school_holidays_enabled INTEGER DEFAULT 0');
+      }
+      const calendarCols = db.prepare("PRAGMA table_info('vacay_holiday_calendars')").all() as Array<{ name: string }>;
+      if (!calendarCols.some(col => col.name === 'type')) {
+        db.exec("ALTER TABLE vacay_holiday_calendars ADD COLUMN type TEXT NOT NULL DEFAULT 'public_holiday'");
+      }
+    },
+    // #1517 — assign trip members / named guests to a reservation (mirrors budget_item_members).
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS reservation_travelers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reservation_id INTEGER NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(reservation_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_reservation_travelers_res ON reservation_travelers(reservation_id);
+        CREATE INDEX IF NOT EXISTS idx_reservation_travelers_user ON reservation_travelers(user_id);
+      `);
+    },
+    // Comp/Flex days (#1074): a vacay entry is either a vacation day (counts toward
+    // the entitlement) or a comp/flex day (kind='comp', costs 0 — flextime/overtime
+    // offset). Orthogonal to fraction, so a half comp day is kind='comp' + fraction=0.5.
+    () => {
+      const hasKind = db.prepare("SELECT 1 FROM pragma_table_info('vacay_entries') WHERE name = 'kind'").get();
+      if (!hasKind) db.exec("ALTER TABLE vacay_entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'vacation'");
+    },
+    // Configurable vacation year (#737): per-user leave-year window. 'calendar' keeps
+    // the Jan 1–Dec 31 default (unchanged for everyone); 'fiscal' starts on a fixed
+    // month/day; 'anniversary' starts on the month/day of the hire date. The year
+    // integer still names a period; the service resolves it to a [start,end) range.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS vacay_user_settings (
+          user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          year_type TEXT NOT NULL DEFAULT 'calendar',
+          year_start_month INTEGER NOT NULL DEFAULT 1,
+          year_start_day INTEGER NOT NULL DEFAULT 1,
+          hire_date TEXT
+        );
+      `);
+    },
+    // Manual GPX track colour (#776): imported tracks all render in the same blue
+    // because the importer never assigns a category, so several walks in the same
+    // area are indistinguishable. NULL keeps the old behaviour (category colour,
+    // then the #3b82f6 fallback) for every existing row.
+    () => {
+      const hasRouteColor = db.prepare("SELECT 1 FROM pragma_table_info('places') WHERE name = 'route_color'").get();
+      if (!hasRouteColor) db.exec('ALTER TABLE places ADD COLUMN route_color TEXT');
+    },
+
+    // Backfill the three places feature toggles before their read flips from
+    // fail-open (`value !== 'false'`) to fail-closed (`value === 'true'`), so
+    // existing installs that never touched the admin switches keep the features
+    // they have today. A row that already says 'false' is left alone.
+    () => {
+      const insert = db.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, 'true')");
+      for (const key of ['places_photos_enabled', 'places_autocomplete_enabled', 'places_details_enabled']) {
+        insert.run(key);
+      }
+    },
+
+    // Free the `note` column on budget items for its actual purpose (#1658).
+    // The costs UI stores an itemized receipt in it as `TICKETJSON:{...}`, which
+    // means an expense split by receipt can never carry a written note, and
+    // saving an expense any other way wipes whatever was typed in the budget
+    // table. The receipt moves to its own column and note becomes text again.
+    // GLOB, not LIKE: LIKE is case-insensitive in SQLite, so a hand-written note
+    // starting "ticketjson:" would be chopped up and its text dropped.
+    () => {
+      const hasTicket = db.prepare("SELECT 1 FROM pragma_table_info('budget_items') WHERE name = 'ticket_json'").get();
+      if (!hasTicket) db.exec('ALTER TABLE budget_items ADD COLUMN ticket_json TEXT');
+      db.exec(`
+        UPDATE budget_items
+           SET ticket_json = substr(note, 12), note = NULL
+         WHERE note GLOB 'TICKETJSON:*'
+      `);
+    },
+
+    // Note colours (#1629). A day note is a label as much as a reminder — "watch
+    // out", "must see", "already booked" — and a wall of identical grey cards
+    // makes that impossible to see at a glance. NULL keeps the neutral card
+    // every existing note has today.
+    () => {
+      const hasColor = db.prepare("SELECT 1 FROM pragma_table_info('day_notes') WHERE name = 'color'").get();
+      if (!hasColor) db.exec('ALTER TABLE day_notes ADD COLUMN color TEXT');
+    },
+
+    // Per-segment travel mode for boundary legs: a leg whose ORIGIN is not a place
+    // (booking arrival, morning hotel) stores its mode on the DESTINATION stop.
+    // NULL = inherit the day default. INERT whenever the previous timeline element
+    // is itself a place (that place's outgoing leg_transport_mode wins).
+    // Appended LAST: the array is index-addressed against schema_version, so a slot
+    // inserted anywhere above this line is simply skipped on every existing database.
+    () => {
+      try {
+        db.exec('ALTER TABLE day_assignments ADD COLUMN incoming_leg_transport_mode TEXT');
+      } catch (err: any) {
+        if (!err.message?.includes('duplicate column name')) throw err;
+      }
+    },
+    // #1298 — an expense can hang off a place, exactly as it already hangs off a
+    // reservation. Same nullable FK, same ON DELETE SET NULL: the delete paths
+    // take the linked expense with the place themselves, so the constraint is a
+    // backstop for anything that removes a place without going through them.
+    // Appended LAST: the array is index-addressed against schema_version, so a
+    // slot inserted above this line never runs on an existing database.
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('budget_items')").all() as Array<{ name: string }>;
+      if (!cols.some(c => c.name === 'place_id')) {
+        db.exec('ALTER TABLE budget_items ADD COLUMN place_id INTEGER REFERENCES places(id) ON DELETE SET NULL DEFAULT NULL');
+      }
+    },
+    // A reservation_day_positions row only makes sense when its reservation and
+    // its day are on the same trip. The table carries no trip_id and its two
+    // foreign keys only ask that the ids exist, so pairs that never belonged
+    // together could accumulate; the writer refuses them now, and this clears
+    // whatever an older build let through. This slot keeps the index it shipped
+    // with on dev — the array is index-addressed against schema_version.
+    () => {
+      db.exec(`
+        DELETE FROM reservation_day_positions
+         WHERE rowid IN (
+           SELECT rdp.rowid
+             FROM reservation_day_positions rdp
+             JOIN reservations r ON r.id = rdp.reservation_id
+             JOIN days d ON d.id = rdp.day_id
+            WHERE d.trip_id <> r.trip_id
+         )
+      `);
+    },
+    // #1939 — the Google Places and Unsplash keys are instance configuration and
+    // now resolve out of app_settings (nest/settings/instance-api-keys.ts). This
+    // carries the value the old resolver would have handed out — the lowest-id
+    // admin who has one — into that row, so an install that upgrades keeps the
+    // key it was searching with instead of falling back to OpenStreetMap.
+    // Only where that key already was the whole install's, though. The resolver
+    // reads the instance row before the caller's own column, so promoting a
+    // personal key while a second row still holds one would move that member
+    // onto a stranger's key and a stranger's bill without anyone saying so. As
+    // soon as another row has a value for the same column nothing is written:
+    // everybody keeps resolving what they resolved before, and a member with no
+    // key of their own searches via OpenStreetMap until an admin saves the
+    // instance key once in the panel. Handing a key to the whole instance is the
+    // admin's call, not a migration's.
+    // The users columns are left alone: they are still the per-user fallback,
+    // and nothing here can lose a value. Stored blobs are copied verbatim; both
+    // sides use the same apiKeyCrypto format, legacy plaintext included.
+    // Appended LAST — the array is index-addressed against schema_version.
+    () => {
+      const upsert = db.prepare(
+        `INSERT INTO app_settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      );
+      for (const column of ['maps_api_key', 'unsplash_api_key'] as const) {
+        const existing = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(column) as
+          | { value: string | null }
+          | undefined;
+        if (existing?.value) continue;
+        const row = db
+          .prepare(
+            `SELECT id, ${column} AS value FROM users
+              WHERE role = 'admin' AND ${column} IS NOT NULL AND ${column} != ''
+              ORDER BY id ASC LIMIT 1`
+          )
+          .get() as { id: number; value: string } | undefined;
+        if (!row?.value) continue;
+        const otherHolder = db
+          .prepare(
+            `SELECT 1 FROM users
+              WHERE id != ? AND ${column} IS NOT NULL AND ${column} != '' LIMIT 1`
+          )
+          .get(row.id);
+        if (otherHolder) continue;
+        upsert.run(column, row.value);
+      }
+    },
+    // Capture metadata on the photo itself (#1614): when it was taken and where.
+    // Both are needed before photos can sit on the Journey map by their own
+    // coordinates, and before a gallery can be ordered by when a picture was
+    // taken rather than when it happened to be added. Nullable throughout —
+    // most providers answer with neither, and a photo without them is normal.
+    // Guarded so re-running the migration tail is a no-op.
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('trek_photos')").all() as Array<{ name: string }>;
+      const has = (name: string) => cols.some(c => c.name === name);
+      if (!has('taken_at')) db.exec('ALTER TABLE trek_photos ADD COLUMN taken_at TEXT');
+      if (!has('lat')) db.exec('ALTER TABLE trek_photos ADD COLUMN lat REAL');
+      if (!has('lng')) db.exec('ALTER TABLE trek_photos ADD COLUMN lng REAL');
+      // Answering "which photos of this journey have coordinates" without a scan.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_trek_photos_geo ON trek_photos(lat, lng) WHERE lat IS NOT NULL AND lng IS NOT NULL');
+    },
+    // A journey shared while the trip is still running reads like a blog, and a
+    // blog puts the newest entry first (#1614). The owner decides per share link,
+    // because it is a property of how the link is meant to be read, not of the
+    // journey. Off by default: an already-published link must not reorder itself
+    // under its readers.
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('journey_share_tokens')").all() as Array<{ name: string }>;
+      if (!cols.some(c => c.name === 'newest_first')) {
+        db.exec('ALTER TABLE journey_share_tokens ADD COLUMN newest_first INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+    /*
+     * TREK Studio books (#1973).
+     *
+     * One row per book, the document itself stored as JSON. A book is a
+     * document rather than a graph of records: the editor loads it whole, the
+     * renderer prints it whole, and nothing ever queries "which books contain a
+     * heart-shaped frame". Normalising spreads and elements into tables would
+     * buy queries nobody makes and cost a join on every open plus a schema
+     * migration for every new element kind.
+     *
+     * `updated_at` and `version` are what make concurrent editing possible:
+     * the version increments on every write, and a client that saves against a
+     * version it did not read gets told rather than silently overwriting.
+     */
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS journey_books (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          journey_id INTEGER NOT NULL REFERENCES journeys(id) ON DELETE CASCADE,
+          title TEXT NOT NULL DEFAULT '',
+          document TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_journey_books_journey ON journey_books(journey_id);
+      `);
+    },
+    /*
+     * Great Britain gained its counties and boroughs back (#1974).
+     *
+     * geoBoundaries' GBR ADM1 is the four constituent countries, so since 3.1.0
+     * the atlas had no polygon below "England" and a London borough marked as
+     * visited had nothing to light up. The bundle now ships GB at ADM2, which is
+     * the granularity the rest of the world gets and the granularity the
+     * pre-3.1.0 Natural Earth layer had.
+     *
+     * Two things need saying to the data that already exists:
+     *
+     * `visited_regions` rows marked before 3.1.0 hold the old Natural Earth
+     * borough codes. They are reconciled by name within the same country,
+     * exactly as the 3.1.1 step above does for every other country — a row that
+     * still cannot be resolved is left alone rather than destroyed, and the
+     * client's name fallback may well still highlight it.
+     *
+     * `place_regions` is a re-derivable cache, and it is full of GB-ENG rows
+     * that were correct under the old bundle. Nothing re-derives a row that is
+     * already there, so without clearing them every English place would keep
+     * reporting "England" forever.
+     */
+    () => {
+      db.exec(`DELETE FROM place_regions WHERE UPPER(COALESCE(country_code, '')) = 'GB'`);
+
+      type Row = { id: number; region_code: string; region_name: string; country_code: string };
+      const rows = db
+        .prepare(`SELECT id, region_code, region_name, country_code FROM visited_regions WHERE UPPER(COALESCE(country_code, '')) = 'GB'`)
+        .all() as Row[];
+      if (rows.length === 0) return;
+
+      let features: { properties?: { iso_a2?: string; iso_3166_2?: string; name?: string } }[];
+      try {
+        const file = path.join(__dirname, '..', '..', 'assets', 'atlas', 'admin1.geojson.gz');
+        features = JSON.parse(zlib.gunzipSync(fs.readFileSync(file)).toString('utf8')).features || [];
+      } catch {
+        return; // bundle unreadable — leave the rows untouched rather than guessing
+      }
+
+      const validCodes = new Set<string>();
+      const nameToCode = new Map<string, string>();
+      for (const f of features) {
+        const p = f.properties || {};
+        if ((p.iso_a2 || '').toUpperCase() !== 'GB' || !p.iso_3166_2) continue;
+        validCodes.add(p.iso_3166_2);
+        if (p.name) nameToCode.set(p.name.toLowerCase(), p.iso_3166_2);
+      }
+      if (validCodes.size === 0) return;
+
+      const update = db.prepare('UPDATE OR IGNORE visited_regions SET region_code = ? WHERE id = ?');
+      for (const row of rows) {
+        if (validCodes.has(row.region_code)) continue;
+        const byName = nameToCode.get((row.region_name || '').toLowerCase());
+        if (byName) update.run(byName, row.id);
+      }
+    },
+    // Storage slice 2 — collab note attachments historically stored 'files/<name>'
+    // in trip_files.filename while the file manager stored bare names in the same
+    // column; the storage layer addresses objects as category + bare name, so
+    // normalize the legacy rows. substr is 1-indexed: 7 drops the six chars of
+    // 'files/'. The LIKE guard makes it a no-op on already-bare rows.
+    //
+    // Appended LAST again, and for the same reason as the note this replaces:
+    // the array is index-addressed against schema_version, so a slot that has
+    // shipped in dev keeps the index it shipped with and anything from this
+    // branch goes after it. A database that already ran this migration at its
+    // pre-merge index replays it harmlessly (the LIKE guard) but skips whatever
+    // now occupies that index. Acceptable only because this branch has never
+    // been published; never do this with a released slot.
+    () => {
+      db.exec("UPDATE trip_files SET filename = substr(filename, 7) WHERE filename LIKE 'files/%'");
+    },
+    // Give back the notes the TICKETJSON step chopped up (#1658).
+    //
+    // That step matched with LIKE, which is case-insensitive in SQLite, so a
+    // note somebody had typed starting "ticketjson:" was read as a receipt: the
+    // first eleven characters were dropped, the rest was moved into ticket_json
+    // and the note was set to NULL. The step now matches with GLOB, but that
+    // only helps a fresh install — the array is index-addressed against
+    // schema_version, so a repaired step never runs again on a database that
+    // already applied it.
+    //
+    // A receipt comes out of JSON.stringify and always parses; typed text does
+    // not. So a row moves back only when its ticket_json fails to parse AND the
+    // note is still empty — anything that parses, and any row someone has
+    // written a note on since, is left exactly as it is. The eleven marker
+    // characters themselves are gone for good: their case was the only thing
+    // separating a receipt from a note, and writing "TICKETJSON:" back would
+    // hand the row straight to the reader that reads that prefix as a receipt.
+    // Appended LAST — the array is index-addressed against schema_version.
+    () => {
+      const rows = db
+        .prepare(
+          `SELECT id, ticket_json FROM budget_items
+            WHERE ticket_json IS NOT NULL AND ticket_json != '' AND COALESCE(note, '') = ''`
+        )
+        .all() as Array<{ id: number; ticket_json: string }>;
+      const restore = db.prepare('UPDATE budget_items SET note = ?, ticket_json = NULL WHERE id = ?');
+      for (const row of rows) {
+        try {
+          JSON.parse(row.ticket_json);
+        } catch {
+          restore.run(row.ticket_json, row.id);
+        }
+      }
+    },
+
+    // A deliberate non-latest plugin install sets `update_hold`: the row leaves the
+    // update banner and "Update all" until the admin resumes updates, or until an
+    // install lands back on the newest compatible version. Only an EXPLICIT version
+    // pick ever sets it — dependency resolution pins versions too, but never
+    // deliberately. Appended LAST — the array is index-addressed against schema_version.
+    () => {
+      try {
+        db.exec('ALTER TABLE plugins ADD COLUMN update_hold INTEGER NOT NULL DEFAULT 0;');
+      } catch (err) {
+        console.warn('[migrations] Non-fatal migration step failed:', err);
+      }
+    },
+
+    // Reservations an automated ingest parked for review are 'staged' and stay
+    // out of the two anonymous exports (ICS feed, shared trip) until a person
+    // confirms them. Nothing writes 'staged' yet; this is the gate the mail
+    // ingest writes through.
+    //
+    // 'live' as the default is what keeps this from being a breaking change:
+    // SQLite fills every existing row on the ALTER, and no current writer names
+    // the column, so every booking that is visible today stays visible.
+    // Appended LAST, the array is index-addressed against schema_version.
+    () => {
+      const hasColumn = db
+        .prepare("SELECT 1 FROM pragma_table_info('reservations') WHERE name = 'ingest_state'")
+        .get();
+      if (!hasColumn) {
+        db.exec("ALTER TABLE reservations ADD COLUMN ingest_state TEXT NOT NULL DEFAULT 'live'");
+      }
+    },
+
+    /*
+     * Separate an integration key from an MCP token (#2089).
+     *
+     * Both live in mcp_tokens and until now both opened everything a token can
+     * open. That was fine while /mcp was the only consumer; with a public REST
+     * surface it means a key somebody minted for a chat client also reads their
+     * trips over HTTP, and a key minted for an integration can drive every MCP
+     * tool. One credential, two very different blast radii.
+     *
+     * `kind` splits them, and every existing row becomes 'mcp' — that is what
+     * they were issued for, and silently widening a key that is already in
+     * somebody's config would be the opposite of what this migration is for.
+     *
+     * Appended LAST: the array is index-addressed against schema_version.
+     */
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('mcp_tokens')").all() as Array<{ name: string }>;
+      if (!cols.some(c => c.name === 'kind')) {
+        db.exec("ALTER TABLE mcp_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'mcp'");
+      }
+    },
   ];
 
   if (currentVersion < migrations.length) {
@@ -3709,15 +4184,24 @@ function runMigrations(db: Database.Database): void {
       try {
         const migration = migrations[i];
         if (typeof migration === 'function') {
-          db.transaction(migration)();
+          // The version bump has to commit together with the migration. Bumped
+          // afterwards, a crash in between leaves the schema advanced and the
+          // version stale, and the next boot replays a step that is not
+          // idempotent, exits 1, and turns one crash into a permanent boot loop.
+          db.transaction(() => {
+            migration();
+            db.prepare('UPDATE schema_version SET version = ?').run(i + 1);
+          })();
         } else {
+          // raw steps run outside a transaction on purpose (see PRAGMA
+          // foreign_keys above), so the bump stays a separate statement.
           migration.raw();
+          db.prepare('UPDATE schema_version SET version = ?').run(i + 1);
         }
       } catch (err) {
         console.error(`[migrations] FATAL: Migration ${i + 1} failed, rolled back:`, err);
         process.exit(1);
       }
-      db.prepare('UPDATE schema_version SET version = ?').run(i + 1);
     }
     console.log(`[DB] Migrations complete — schema version ${migrations.length}`);
   }

@@ -11,6 +11,7 @@
  * tool/response_format and keep using the existing clients.)
  */
 
+import { parseLenientJson } from '../lenient-json';
 import { safeFetchLlm } from '../../../utils/ssrfGuard';
 
 const TIMEOUT_MS = 300_000;
@@ -31,18 +32,12 @@ export interface EnforcedExtractInput {
 
 /** Resolve the native API base from a config base URL that may end in `/v1`. */
 export function toNativeBase(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '');
-}
-
-/** Strip code fences and JSON.parse; returns null on failure. */
-function parseJson(content: string | undefined | null): unknown {
-  if (!content) return null;
-  const stripped = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  try {
-    return JSON.parse(stripped);
-  } catch {
-    return null;
-  }
+  // Trailing slashes come off as a scan, not /\/+$/: that pattern is unanchored at the
+  // front, so the engine restarts it at every slash of a run and rescans to the end each
+  // time (quadratic — 25s on 200k). Same result: the maximal trailing run goes.
+  let end = baseUrl.length;
+  while (end > 0 && baseUrl[end - 1] === '/') end--;
+  return baseUrl.slice(0, end).replace(/\/v1$/, '');
 }
 
 /**
@@ -94,6 +89,6 @@ export async function extractEnforced(input: EnforcedExtractInput): Promise<Reco
   }
 
   const data = (await res.json()) as { message?: { content?: string } };
-  const parsed = parseJson(data.message?.content);
+  const parsed = parseLenientJson(data.message?.content);
   return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
 }

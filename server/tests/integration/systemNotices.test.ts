@@ -95,14 +95,21 @@ describe('GET /api/system-notices/active', () => {
   it('returns no login/version-gated notices for an established user', async () => {
     const { user } = createUser(testDb);
     // login_count > 1 means firstLogin does not match; first_seen_version >= 3.0.0 means
-    // existingUserBeforeVersion('3.0.0') does not match either. The always-on thank-you
-    // notice (no conditions) may still apply, so only filter it out.
+    // existingUserBeforeVersion('3.0.0') does not match either. Notices that gate on
+    // nothing but the install being self-hosted still apply, and which ones those are
+    // changes every release — the thank-you modal handed over to release-4-0-0 at 4.0.0.
+    // Read the set out of the registry rather than naming them, or this ages out again.
     testDb.prepare('UPDATE users SET login_count = 5, first_seen_version = ? WHERE id = ?').run('3.0.0', user.id);
+    const alwaysOn = new Set(
+      SYSTEM_NOTICES
+        .filter(n => (n.conditions ?? []).every(c => c.kind === 'managed'))
+        .map(n => n.id),
+    );
     const res = await request(app)
       .get('/api/system-notices/active')
       .set('Cookie', authCookie(user.id));
     expect(res.status).toBe(200);
-    expect(res.body.filter((n: { id: string }) => n.id !== 'thank-you-support')).toEqual([]);
+    expect(res.body.filter((n: { id: string }) => !alwaysOn.has(n.id))).toEqual([]);
   });
 
   it('returns firstLogin notice for user with login_count <= 1', async () => {
@@ -171,33 +178,53 @@ describe('GET /api/system-notices/active', () => {
     }
   });
 
+  // Drives the recurrence mechanism through a notice this test owns. It used to
+  // ride on thank-you-support, which stopped applying the moment that notice was
+  // capped at 4.0.0 — the mechanism was fine, the fixture had retired.
   it('re-surfaces a per-version notice after an upgrade but hides it within the same version', async () => {
-    const TY = 'thank-you-support';
-    const { user } = createUser(testDb);
-    testDb.prepare('UPDATE users SET login_count = 5, first_seen_version = ? WHERE id = ?').run('3.0.0', user.id);
-
-    const shows = async () => {
-      const res = await request(app)
-        .get('/api/system-notices/active')
-        .set('Cookie', authCookie(user.id));
-      expect(res.status).toBe(200);
-      return res.body.some((n: { id: string }) => n.id === TY);
+    const RECURRING: SystemNotice = {
+      id: 'test-per-version-notice',
+      display: 'modal',
+      severity: 'info',
+      titleKey: 'system_notice.test_per_version_notice.title',
+      bodyKey: 'system_notice.test_per_version_notice.body',
+      dismissible: true,
+      conditions: [],
+      recurring: 'per-version',
+      publishedAt: '2026-01-01T00:00:00Z',
+      priority: 0,
     };
+    SYSTEM_NOTICES.push(RECURRING);
+    try {
+      const { user } = createUser(testDb);
+      testDb.prepare('UPDATE users SET login_count = 5, first_seen_version = ? WHERE id = ?').run('3.0.0', user.id);
 
-    // Fresh user with no dismissal: the recurring thank-you shows.
-    expect(await shows()).toBe(true);
+      const shows = async () => {
+        const res = await request(app)
+          .get('/api/system-notices/active')
+          .set('Cookie', authCookie(user.id));
+        expect(res.status).toBe(200);
+        return res.body.some((n: { id: string }) => n.id === RECURRING.id);
+      };
 
-    // Dismissed at an old version → it returns once the running version is newer.
-    testDb.prepare(
-      'INSERT INTO user_notice_dismissals (user_id, notice_id, dismissed_at, dismissed_app_version) VALUES (?, ?, ?, ?)'
-    ).run(user.id, TY, Date.now(), '0.0.1');
-    expect(await shows()).toBe(true);
+      // Fresh user with no dismissal: the recurring notice shows.
+      expect(await shows()).toBe(true);
 
-    // Dismissed at a version >= the running one → stays hidden until the next upgrade.
-    testDb.prepare(
-      'UPDATE user_notice_dismissals SET dismissed_app_version = ? WHERE user_id = ? AND notice_id = ?'
-    ).run('99.0.0', user.id, TY);
-    expect(await shows()).toBe(false);
+      // Dismissed at an old version → it returns once the running version is newer.
+      testDb.prepare(
+        'INSERT INTO user_notice_dismissals (user_id, notice_id, dismissed_at, dismissed_app_version) VALUES (?, ?, ?, ?)'
+      ).run(user.id, RECURRING.id, Date.now(), '0.0.1');
+      expect(await shows()).toBe(true);
+
+      // Dismissed at a version >= the running one → stays hidden until the next upgrade.
+      testDb.prepare(
+        'UPDATE user_notice_dismissals SET dismissed_app_version = ? WHERE user_id = ? AND notice_id = ?'
+      ).run('99.0.0', user.id, RECURRING.id);
+      expect(await shows()).toBe(false);
+    } finally {
+      const idx = SYSTEM_NOTICES.indexOf(RECURRING);
+      if (idx !== -1) SYSTEM_NOTICES.splice(idx, 1);
+    }
   });
 });
 

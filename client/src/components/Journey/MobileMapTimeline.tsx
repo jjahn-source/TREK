@@ -5,6 +5,7 @@ import MobileEntryCard from './MobileEntryCard'
 import type { JourneyMapHandle } from './JourneyMap'
 import type { JourneyEntry } from '../../store/journeyStore'
 import { DAY_COLORS } from './dayColors'
+import type { JourneyTrack } from '@trek/shared'
 
 interface MapEntry {
   id: string
@@ -19,31 +20,36 @@ interface Props {
   entries: JourneyEntry[] | any[]
   mapEntries: MapEntry[]
   trail?: { lat: number; lng: number }[]
+  tracks?: JourneyTrack[]
   dark?: boolean
   readOnly?: boolean
   onEntryClick: (entry: any) => void
   onAddEntry?: () => void
   publicPhotoUrl?: (photoId: number) => string
   carouselBottom?: string
+  /** CARTO key from the share payload, forwarded to the map (#2054). */
+  cartoApiKey?: string
 }
 
 export default function MobileMapTimeline({
   entries,
   mapEntries,
   trail,
+  tracks,
   dark,
   readOnly,
   onEntryClick,
   onAddEntry,
   publicPhotoUrl,
   carouselBottom = 'calc(var(--bottom-nav-h, 84px) + 8px)',
+  cartoApiKey,
 }: Props) {
   const mapRef = useRef<JourneyMapHandle>(null)
   const carouselRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
 
   const entryDayMeta = useMemo(() => {
-    const uniqueDates = [...new Set(entries.map((e: any) => e.entry_date).sort())]
+    const uniqueDates = [...new Set(entries.map((e: any) => e.entry_date).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)))]
     const counters = new Map<string, number>()
     return entries.map((e: any) => {
       const dayIdx = uniqueDates.indexOf(e.entry_date)
@@ -65,6 +71,12 @@ export default function MobileMapTimeline({
       try { mapRef.current?.highlightMarker(null) } catch {}
     }
   }, [entries, mapEntries])
+  // The delayed initial focus reads both through refs so it always works off
+  // the current map entries, not the ones from the render that armed the timer.
+  const syncMapToCarouselRef = useRef(syncMapToCarousel)
+  syncMapToCarouselRef.current = syncMapToCarousel
+  const activeIndexRef = useRef(activeIndex)
+  activeIndexRef.current = activeIndex
 
   // Pick the card that's currently closest to the carousel horizontal center.
   // More stable than IntersectionObserver thresholds when the active card can
@@ -129,13 +141,15 @@ export default function MobileMapTimeline({
     }
   }, [activeIndex, onEntryClick, scrollCardIntoCenter])
 
-  // Initial map focus — delay to let Leaflet initialize and fitBounds
+  // Initial map focus — delay to let Leaflet initialize and fitBounds. Also
+  // re-runs when the markers arrive later than the entries, otherwise the
+  // focus would fire against an empty map and never be retried.
   useEffect(() => {
     if (entries.length > 0) {
-      const timer = setTimeout(() => syncMapToCarousel(0), 500)
+      const timer = setTimeout(() => syncMapToCarouselRef.current(activeIndexRef.current), 500)
       return () => clearTimeout(timer)
     }
-  }, [entries.length])
+  }, [entries.length, mapEntries.length])
 
   const activeEntryId = entries[activeIndex]
     ? String(entries[activeIndex].id)
@@ -152,14 +166,16 @@ export default function MobileMapTimeline({
           entries={mapEntries}
           checkins={[]}
           trail={trail}
+          tracks={tracks}
           height={9999}
           dark={dark}
           onMarkerClick={handleMarkerClick}
           fullScreen
+          cartoApiKey={cartoApiKey}
         />
         {!readOnly && onAddEntry && (
           <div className="fixed right-4 z-30" style={{ bottom: 'calc(var(--bottom-nav-h, 84px) + 16px)' }}>
-            <button
+            <button type="button"
               onClick={onAddEntry}
               className="w-12 h-12 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
             >
@@ -182,12 +198,14 @@ export default function MobileMapTimeline({
         entries={mapEntries}
         checkins={[]}
         trail={trail}
+        tracks={tracks}
         height={9999}
         dark={dark}
         activeMarkerId={activeEntryId}
         onMarkerClick={handleMarkerClick}
         fullScreen
         paddingBottom={200}
+        cartoApiKey={cartoApiKey}
       />
 
       {/* Bottom carousel */}
@@ -231,7 +249,7 @@ export default function MobileMapTimeline({
           className="fixed right-4 z-30"
           style={{ bottom: 'calc(var(--bottom-nav-h, 84px) + 168px)' }}
         >
-          <button
+          <button type="button"
             onClick={onAddEntry}
             className="w-12 h-12 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
           >

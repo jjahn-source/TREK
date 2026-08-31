@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': '刪除這筆支出？',
+  'costs.confirm.deleteBody': '「{name}」將被永久刪除。',
   'budget.title': '預算',
   'budget.exportCsv': '匯出 CSV',
   'budget.emptyTitle': '尚未建立預算',
@@ -86,6 +88,11 @@ const budget: TranslationStrings = {
   'costs.undo': '復原',
   'costs.whatFor': '這筆是什麼支出？',
   'costs.namePlaceholder': '例如：晚餐、紀念品、油費…',
+  'costs.note': '備註',
+  'costs.notePlaceholder': '包含哪些內容、誰需要還款…',
+  'costs.addNote': '新增備註',
+  'costs.showNote': '顯示備註',
+  'costs.hideNote': '隱藏備註',
   'costs.totalAmount': '總金額',
   'costs.currency': '貨幣',
   'costs.day': '日期',
@@ -109,6 +116,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': '費用與票券',
   'costs.cat.health': '健康',
   'costs.cat.tips': '小費',
+  'costs.cat.fuel': '燃油',
+  'costs.cat.parking': '停車',
   'costs.cat.other': '其他',
   'costs.daysCount': '{count} 天',
   'costs.travelers': '{count} 位旅伴',
@@ -128,5 +137,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': '所有類別',
   'costs.filter.allDays': '所有日期',
   'costs.expensesCount': '{count} 筆支出',
+  'costs.ticketItemName': '品項名稱',
+  'costs.ticketSplitting': '分攤：',
+  'costs.ticketAddItem': '新增品項',
+  'costs.ticketShares': '每人分攤額',
+  'costs.excluded': '不參與',
+  'costs.splitBalanced': '分攤金額與總額相符',
+  'costs.splitSumUnder': '分攤合計：{total} 中的 {sum}（少 {diff}）',
+  'costs.splitSumOver': '分攤合計：{total} 中的 {sum}（多 {diff}）',
 };
 export default budget;

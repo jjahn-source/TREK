@@ -4,6 +4,9 @@ import type { Settings } from '../types'
 import { DEFAULT_APPEARANCE } from '@trek/shared'
 import { getApiErrorMessage } from '../types'
 import { SUPPORTED_LANGUAGE_CODES } from '../i18n/supportedLanguages'
+import { normalizeTileUrl, stripTileApiKey } from '../utils/tileUrl'
+import { clearTileCache } from '../sync/tilePrefetcher'
+import { rememberStartDestination, DEFAULT_START_PAGE, DEFAULT_START_TRIP_TAB } from '../utils/startDestination'
 
 interface SettingsState {
   settings: Settings
@@ -39,7 +42,9 @@ export const DEFAULT_SETTINGS: Settings = {
   show_place_description: false,
   optimize_from_accommodation: true,
   map_provider: 'leaflet',
+  map_base_layer: 'default',
   map_poi_pill_enabled: true,
+  carto_api_key: '',
   mapbox_access_token: '',
   mapbox_style: 'mapbox://styles/mapbox/standard',
   maplibre_style: '',
@@ -47,9 +52,32 @@ export const DEFAULT_SETTINGS: Settings = {
   mapbox_quality_mode: false,
   dashboard_fx_from: 'EUR',
   dashboard_fx_to: 'USD',
+  start_page: DEFAULT_START_PAGE,
+  start_trip_tab: DEFAULT_START_TRIP_TAB,
   appearance: DEFAULT_APPEARANCE,
   // dashboard_timezones is intentionally left unset so the widget can tell "never
   // chosen" (fall back to home + defaults) from an explicitly emptied list.
+}
+
+// De-dupe concurrent loads: the reconnection triggers (online / visibility /
+// periodic) can all fire a retry at once — collapse them into one in-flight GET.
+let _loadInFlight: Promise<void> | null = null
+
+// Every tile consumer (planner map, journey map, tile prefetcher, the settings
+// preview) reads the template from this store, so the retired
+// {s}.tile.openstreetmap.org host is rewritten here — on the way in from the
+// server and on the way out to it. Rewriting only on read would let a template
+// typed by hand survive in the database until the next load put it back (#1733).
+function withNormalizedTileUrl<T extends Partial<Settings>>(patch: T): T {
+  if (typeof patch.map_tile_url !== 'string') return patch
+  return { ...patch, map_tile_url: cleanTileTemplate(patch.map_tile_url) }
+}
+
+// A CARTO key pasted along with a full tile URL is dropped here: the key lives
+// in its own setting and is appended at render time, so leaving it in the
+// template would freeze it into the saved value and break on the next rotation.
+function cleanTileTemplate(url: string): string {
+  return stripTileApiKey(normalizeTileUrl(url))
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -57,25 +85,44 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isLoaded: false,
 
   loadSettings: async () => {
-    try {
-      const data = await settingsApi.get()
-      set((state) => ({
-        settings: { ...state.settings, ...data.settings },
-        isLoaded: true,
-      }))
-    } catch (err: unknown) {
-      set({ isLoaded: true })
-      console.error('Failed to load settings:', err)
-    }
+    if (_loadInFlight !== null) return _loadInFlight
+    _loadInFlight = (async () => {
+      try {
+        const data = await settingsApi.get()
+        // Rewritten here so the Map settings input already shows the host that
+        // still resolves, and persists it on the next save.
+        const incoming = withNormalizedTileUrl({ ...data.settings } as Partial<Settings>)
+        set((state) => ({
+          settings: { ...state.settings, ...incoming },
+          isLoaded: true,
+        }))
+        // The startup redirect runs before this ever resolves, so keep a mirror
+        // it can read synchronously on the next launch.
+        rememberStartDestination(incoming)
+      } catch (err: unknown) {
+        // Leave isLoaded false so a transient failure — offline at launch, or a
+        // (docker) server cold-start racing the first request — is retried on
+        // reconnect instead of stranding the user on built-in defaults (wrong
+        // currency/units) for the whole session (#1618).
+        console.error('Failed to load settings:', err)
+      } finally {
+        _loadInFlight = null
+      }
+    })()
+    return _loadInFlight
   },
 
   updateSetting: async (key: keyof Settings, value: Settings[keyof Settings]) => {
+    const next =
+      key === 'map_tile_url' && typeof value === 'string' ? cleanTileTemplate(value) : value
+    if (key === 'carto_api_key' && next !== get().settings.carto_api_key) void clearTileCache()
     set((state) => ({
-      settings: { ...state.settings, [key]: value },
+      settings: { ...state.settings, [key]: next },
     }))
-    if (key === 'language') localStorage.setItem('app_language', value as string)
+    if (key === 'language') localStorage.setItem('app_language', next as string)
+    rememberStartDestination({ [key]: next } as Partial<Settings>)
     try {
-      await settingsApi.set(key, value)
+      await settingsApi.set(key, next)
     } catch (err: unknown) {
       console.error('Failed to save setting:', err)
       throw new Error(getApiErrorMessage(err, 'Error saving setting'))
@@ -96,11 +143,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateSettings: async (settingsObj: Partial<Settings>) => {
+    const patch = withNormalizedTileUrl(settingsObj)
+    // Cached tiles are keyed by their full URL, so a new key leaves the whole
+    // offline cache stranded behind the old one.
+    if ('carto_api_key' in patch && patch.carto_api_key !== get().settings.carto_api_key) {
+      void clearTileCache()
+    }
     set((state) => ({
-      settings: { ...state.settings, ...settingsObj },
+      settings: { ...state.settings, ...patch },
     }))
+    rememberStartDestination(patch)
     try {
-      await settingsApi.setBulk(settingsObj)
+      await settingsApi.setBulk(patch)
     } catch (err: unknown) {
       console.error('Failed to save settings:', err)
       throw new Error(getApiErrorMessage(err, 'Error saving settings'))

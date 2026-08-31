@@ -6,6 +6,7 @@ import { useTranslation } from '../../i18n'
 import apiClient from '../../api/client'
 import { formatDate as fmtDate } from '../../utils/formatters'
 import type { TodoItem } from '../../types'
+import { localToday } from '../Planner/today'
 import type { FilterType, Member } from './todoListModel'
 
 /**
@@ -62,16 +63,22 @@ export function useTodoList(tripId: number, items: TodoItem[], addItemSignal: nu
   const categories = useMemo(() => {
     const cats = new Set<string>()
     items.forEach(i => { if (i.category) cats.add(i.category) })
-    return Array.from(cats).sort()
+    // Category names are free text the user types, and TREK ships 23 locales — a
+    // bare .sort() is byte order, which files every accented name behind the whole
+    // ASCII range ("Übernachtung" after "Zelt").
+    return Array.from(cats).sort((a, b) => a.localeCompare(b))
   }, [items])
 
-  const today = new Date().toISOString().split('T')[0]
+  // due_date is a bare calendar date, so "today" has to be the user's calendar
+  // day: toISOString() hands over the UTC one and shifts the overdue cut-off.
+  const today = localToday()
 
   const filtered = useMemo(() => {
     let result: TodoItem[]
     if (filter === 'all') result = items.filter(i => !i.checked)
     else if (filter === 'done') result = items.filter(i => !!i.checked)
-    else if (filter === 'my') result = items.filter(i => !i.checked && i.assigned_user_id === currentUserId)
+    // No resolved user means nothing is "mine" — matching the myCount badge.
+    else if (filter === 'my') result = currentUserId ? items.filter(i => !i.checked && i.assigned_user_id === currentUserId) : []
     else if (filter === 'overdue') result = items.filter(i => !i.checked && i.due_date && i.due_date < today)
     else result = items.filter(i => i.category === filter)
     if (sortByPrio) result = [...result].sort((a, b) => {

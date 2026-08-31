@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Ta bort utgift?',
+  'costs.confirm.deleteBody': '"{name}" tas bort permanent.',
   'budget.title': 'Budget',
   'budget.exportCsv': 'Exportera CSV',
   'budget.emptyTitle': 'Ingen budget har skapats ännu',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Ångra',
   'costs.whatFor': 'Vad var det till för?',
   'costs.namePlaceholder': 't.ex. middag, souvenirer, bensin…',
+  'costs.note': 'Anteckning',
+  'costs.notePlaceholder': 'Vad det omfattade, vem som ska betala tillbaka…',
+  'costs.addNote': 'Lägg till anteckning',
+  'costs.showNote': 'Visa anteckning',
+  'costs.hideNote': 'Dölj anteckning',
   'costs.totalAmount': 'Totalt belopp',
   'costs.currency': 'Valuta',
   'costs.day': 'Dag',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Avgifter och biljetter',
   'costs.cat.health': 'Hälsa',
   'costs.cat.tips': 'Dricks',
+  'costs.cat.fuel': 'Bränsle',
+  'costs.cat.parking': 'Parkering',
   'costs.cat.other': 'Annat',
   'costs.daysCount': '{count} dagar',
   'costs.travelers': '{count} resenärer',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Alla kategorier',
   'costs.filter.allDays': 'Alla dagar',
   'costs.expensesCount': '{count} utgifter',
+  'costs.ticketItemName': 'Artikelnamn',
+  'costs.ticketSplitting': 'Delas mellan:',
+  'costs.ticketAddItem': 'Lägg till artikel',
+  'costs.ticketShares': 'Andel per person',
+  'costs.excluded': 'Inte med',
+  'costs.splitBalanced': 'Fördelningen stämmer med totalen',
+  'costs.splitSumUnder': 'Summan av delarna: {sum} av {total} ({diff} saknas)',
+  'costs.splitSumOver': 'Summan av delarna: {sum} av {total} ({diff} för mycket)',
 };
 export default budget;

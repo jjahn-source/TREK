@@ -44,17 +44,8 @@ vi.mock('../../src/config', () => ({
   DEFAULT_LANGUAGE: 'en',
 }));
 
-const { isAddonEnabledMock } = vi.hoisted(() => {
-    const isAddonEnabledMock = vi.fn().mockReturnValue(true);
-    return { isAddonEnabledMock };
-});
-vi.mock('../../src/services/adminService', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../src/services/adminService')>();
-    return { ...actual, isAddonEnabled: isAddonEnabledMock };
-});
-
-vi.mock('../../src/services/notifications', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../src/services/notifications')>();
+vi.mock('../../src/app-config', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/app-config')>();
     return { ...actual, getMcpSafeUrl: () => 'https://trek.example.com' };
 });
 
@@ -67,7 +58,22 @@ import { runMigrations } from '../../src/db/migrations';
 import { resetTestDb, resetRateLimits } from '../helpers/test-db';
 import { createUser } from '../helpers/factories';
 import { authCookie } from '../helpers/auth';
-import { createOAuthClient, createAuthCode, getUserByAccessToken } from '../../src/services/oauthService';
+import { ALL_SCOPES } from '../../src/mcp/scopes';
+import { OauthService } from '../../src/nest/oauth/oauth.service';
+import { DatabaseService } from '../../src/nest/database/database.service';
+import { AddonsService } from '../../src/nest/addons/addons.service';
+import { AuditService } from '../../src/nest/audit/audit.service';
+
+// In production the consent controller writes pending codes through the
+// container instance and the SDK routes read them back through the same
+// injected singleton. These tests write codes the way the consent controller
+// does: through a service instance. The pending-code map is module-scoped in
+// oauth.pending-codes.ts, so the routes under test see every code written here.
+const oauthDbs = new DatabaseService(testDb);
+const containerSideOauth = new OauthService(oauthDbs, new AddonsService(oauthDbs), new AuditService(oauthDbs));
+const createAuthCode = containerSideOauth.createAuthCode.bind(containerSideOauth);
+const createOAuthClient = containerSideOauth.createOAuthClient.bind(containerSideOauth);
+const getUserByAccessToken = containerSideOauth.getUserByAccessToken.bind(containerSideOauth);
 
 let nestApp: INestApplication;
 let app: Application;
@@ -79,13 +85,11 @@ function makePkce() {
     return { verifier, challenge };
 }
 
-// A7: under the unified Nest app the adminService mock only reaches the directly
-// imported isAddonEnabled (OauthService.mcpEnabled); oauthService.ts reads the
-// addon state through its own import that the Nest module graph loads unmocked,
-// so it falls back to the real DB row. Drive BOTH so the MCP-enabled state is
-// consistent across mcpEnabled() AND validateAuthorizeRequest()/token/revoke.
+// Since the admin-1 extraction, both OauthService (injected AddonsService) and
+// the legacy oauthService (addons.bridge) resolve the MCP addon from the real
+// addons row, so driving the DB row keeps mcpEnabled() AND
+// validateAuthorizeRequest()/token/revoke consistent from one source.
 function setMcpEnabled(enabled: boolean) {
-    isAddonEnabledMock.mockReturnValue(enabled);
     testDb.prepare(
         "INSERT OR REPLACE INTO addons (id, name, description, type, icon, enabled, sort_order) VALUES ('mcp', 'MCP', 'AI assistant integration', 'integration', 'Terminal', ?, 12)"
     ).run(enabled ? 1 : 0);
@@ -162,6 +166,87 @@ describe('DCR scope optional — ChatGPT compatibility (issue #959 bug 2)', () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Platform/discovery parity pins — byte-level oracles for the MCP/OAuth mount
+// migration (these must pass identically before AND after the routes move
+// behind the Nest container).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('platform/discovery parity pins', () => {
+    it('PLAT-PIN-001 — GET /api/health returns the exact probe body + Cache-Control', async () => {
+        const res = await request(app).get('/api/health');
+        expect(res.status).toBe(200);
+        expect(res.headers['cache-control']).toBe('no-store, must-revalidate');
+        expect(res.body).toEqual({ status: 'ok' });
+    });
+
+    it('PLAT-PIN-002 — openid-configuration is the AS metadata plus userinfo_endpoint, exactly', async () => {
+        const res = await request(app).get('/.well-known/openid-configuration');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            issuer:                                'https://trek.example.com',
+            authorization_endpoint:                'https://trek.example.com/oauth/authorize',
+            token_endpoint:                        'https://trek.example.com/oauth/token',
+            revocation_endpoint:                   'https://trek.example.com/oauth/revoke',
+            registration_endpoint:                 'https://trek.example.com/oauth/register',
+            response_types_supported:              ['code'],
+            grant_types_supported:                 ['authorization_code', 'refresh_token', 'client_credentials'],
+            code_challenge_methods_supported:      ['S256'],
+            token_endpoint_auth_methods_supported: ['client_secret_post', 'none'],
+            scopes_supported:                      ALL_SCOPES,
+            userinfo_endpoint:                     'https://trek.example.com/oauth/userinfo',
+        });
+    });
+
+    it('PLAT-PIN-003 — flat oauth-protected-resource is the exact 5-key RFC 9728 document', async () => {
+        const res = await request(app).get('/.well-known/oauth-protected-resource');
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            resource:                 'https://trek.example.com/mcp',
+            authorization_servers:    ['https://trek.example.com'],
+            bearer_methods_supported: ['header'],
+            scopes_supported:         ALL_SCOPES,
+            resource_name:            'TREK MCP',
+        });
+    });
+
+    it('PLAT-PIN-004 — every /.well-known/* path 404s with an EMPTY body when MCP is disabled', async () => {
+        setMcpEnabled(false);
+        for (const path of [
+            '/.well-known/openid-configuration',
+            '/.well-known/oauth-protected-resource',
+            '/.well-known/oauth-authorization-server',
+        ]) {
+            const res = await request(app).get(path);
+            expect(res.status, path).toBe(404);
+            expect(res.text, path).toBe('');
+        }
+    });
+
+    it('PLAT-PIN-005 — an unhandled /.well-known path gets the JSON 404, never SPA HTML', async () => {
+        const res = await request(app).get('/.well-known/does-not-exist');
+        expect(res.status).toBe(404);
+        expect(res.body).toEqual({ error: 'not_found' });
+    });
+
+    it('PLAT-PIN-006 — /.well-known/ (trailing slash) also gets the JSON 404', async () => {
+        const res = await request(app).get('/.well-known/');
+        expect(res.status).toBe(404);
+        expect(res.body).toEqual({ error: 'not_found' });
+    });
+
+    it('PLAT-PIN-007 — bare /.well-known falls through to the router 404 envelope', async () => {
+        const res = await request(app).get('/.well-known');
+        expect(res.status).toBe(404);
+        expect(res.body).toEqual({ error: 'Cannot GET /.well-known' });
+    });
+
+    it('PLAT-PIN-008 — /oauth/consent responses carry the relaxed COOP header', async () => {
+        const res = await request(app).get('/oauth/consent');
+        expect(res.headers['cross-origin-opener-policy']).toBe('unsafe-none');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /oauth/token — authorization_code grant
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -223,6 +308,7 @@ describe('POST /oauth/token — authorization_code grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Try to use it with client2
@@ -252,6 +338,7 @@ describe('POST /oauth/token — authorization_code grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const res = await request(app)
@@ -280,6 +367,7 @@ describe('POST /oauth/token — authorization_code grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const res = await request(app)
@@ -308,6 +396,7 @@ describe('POST /oauth/token — authorization_code grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const res = await request(app)
@@ -336,6 +425,7 @@ describe('POST /oauth/token — authorization_code grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const res = await request(app)
@@ -398,6 +488,7 @@ describe('POST /oauth/token — refresh_token grant', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Exchange code for tokens
@@ -489,6 +580,7 @@ describe('POST /oauth/revoke', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const tokenRes = await request(app)
@@ -728,20 +820,42 @@ describe('POST /api/oauth/authorize', () => {
 
     it('OAUTH-030 — user denied returns redirect with error=access_denied', async () => {
         const { user } = createUser(testDb);
+        const r = createOAuthClient(user.id, 'App', ['https://app.example.com/cb'], ['trips:read']);
+        const { challenge } = makePkce();
 
         const res = await request(app)
             .post('/api/oauth/authorize')
             .set('Cookie', authCookie(user.id))
             .send({
                 approved: false,
-                client_id: 'any',
+                client_id: r.client!.client_id,
                 redirect_uri: 'https://app.example.com/cb',
                 scope: 'trips:read',
-                code_challenge: 'c',
+                code_challenge: challenge,
                 code_challenge_method: 'S256',
             });
         expect(res.status).toBe(200);
         expect(res.body.redirect).toContain('error=access_denied');
+    });
+
+    it('OAUTH-030b — a denial for an unregistered redirect_uri is refused, not redirected', async () => {
+        const { user } = createUser(testDb);
+        const r = createOAuthClient(user.id, 'App', ['https://app.example.com/cb'], ['trips:read']);
+        const { challenge } = makePkce();
+
+        const res = await request(app)
+            .post('/api/oauth/authorize')
+            .set('Cookie', authCookie(user.id))
+            .send({
+                approved: false,
+                client_id: r.client!.client_id,
+                redirect_uri: 'https://attacker.example.com/cb',
+                scope: 'trips:read',
+                code_challenge: challenge,
+                code_challenge_method: 'S256',
+            });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('invalid_redirect_uri');
     });
 
     it('OAUTH-031 — invalid params returns 400', async () => {
@@ -909,6 +1023,7 @@ describe('Sessions — /api/oauth/sessions', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Get a token so there's a session to revoke
@@ -1017,6 +1132,7 @@ describe('H1 — PKCE format validation', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Submit a valid-looking but wrong-format verifier (too short)
@@ -1074,6 +1190,7 @@ describe('H5 — All invalid_grant cases return identical response body', () => 
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Bad code
@@ -1094,6 +1211,7 @@ describe('H5 — All invalid_grant cases return identical response body', () => 
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
         const res2 = await request(app).post('/oauth/token').send({
             grant_type: 'authorization_code',
@@ -1207,6 +1325,17 @@ describe('M7 — Cookie-only auth on privileged OAuth endpoints', () => {
 });
 
 describe('C3 — Refresh token replay detection', () => {
+    /**
+     * Push a rotation out of the concurrency grace window (#1007) so a replay
+     * below still describes theft — a token used minutes later — rather than two
+     * clients refreshing at the same moment.
+     */
+    function agePastGrace(rawRefreshToken: string) {
+        const hash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
+        const old = new Date(Date.now() - 5 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+        testDb.prepare('UPDATE oauth_tokens SET revoked_at = ? WHERE refresh_token_hash = ?').run(old, hash);
+    }
+
     it('OAUTH-SEC-012 — replaying a rotated (old) refresh token returns invalid_grant', async () => {
         const { user } = createUser(testDb);
         const r = createOAuthClient(user.id, 'App', ['https://app.example.com/cb'], ['trips:read']);
@@ -1219,6 +1348,7 @@ describe('C3 — Refresh token replay detection', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         // Get initial tokens
@@ -1243,6 +1373,7 @@ describe('C3 — Refresh token replay detection', () => {
         expect(t2.status).toBe(200);
 
         // Replay the original (now rotated/revoked) refresh token — must be rejected
+        agePastGrace(originalRefreshToken);
         const t3 = await request(app).post('/oauth/token').send({
             grant_type: 'refresh_token',
             client_id: r.client!.client_id,
@@ -1251,6 +1382,46 @@ describe('C3 — Refresh token replay detection', () => {
         });
         expect(t3.status).toBe(400);
         expect(t3.body.error).toBe('invalid_grant');
+    });
+
+    it('OAUTH-SEC-012b — two clients refreshing the same token at once both keep working (#1007)', async () => {
+        const { user } = createUser(testDb);
+        const r = createOAuthClient(user.id, 'App', ['https://app.example.com/cb'], ['trips:read']);
+        const { verifier, challenge } = makePkce();
+
+        const code = createAuthCode({
+            clientId: r.client!.client_id as string,
+            userId: user.id,
+            redirectUri: 'https://app.example.com/cb',
+            scopes: ['trips:read'],
+            codeChallenge: challenge,
+            codeChallengeMethod: 'S256',
+            resource: null,
+        });
+        const t1 = await request(app).post('/oauth/token').send({
+            grant_type: 'authorization_code',
+            client_id: r.client!.client_id,
+            client_secret: r.client!.client_secret,
+            code,
+            redirect_uri: 'https://app.example.com/cb',
+            code_verifier: verifier,
+        });
+        const shared = t1.body.refresh_token;
+
+        const refresh = () => request(app).post('/oauth/token').send({
+            grant_type: 'refresh_token',
+            client_id: r.client!.client_id,
+            client_secret: r.client!.client_secret,
+            refresh_token: shared,
+        });
+
+        // The second MCP session posts the token its sibling has just spent.
+        const first = await refresh();
+        const second = await refresh();
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(second.body.refresh_token).not.toBe(first.body.refresh_token);
     });
 
     it('OAUTH-SEC-013 — replaying old token also invalidates the new chain', async () => {
@@ -1265,6 +1436,7 @@ describe('C3 — Refresh token replay detection', () => {
             scopes: ['trips:read'],
             codeChallenge: challenge,
             codeChallengeMethod: 'S256',
+            resource: null,
         });
 
         const t1 = await request(app).post('/oauth/token').send({
@@ -1287,6 +1459,7 @@ describe('C3 — Refresh token replay detection', () => {
         const newRefreshToken = t2.body.refresh_token;
 
         // Replay original — triggers chain revocation
+        agePastGrace(originalRefreshToken);
         await request(app).post('/oauth/token').send({
             grant_type: 'refresh_token',
             client_id: r.client!.client_id,

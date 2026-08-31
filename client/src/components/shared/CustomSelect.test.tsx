@@ -80,6 +80,30 @@ describe('CustomSelect', () => {
     expect(screen.queryByText('Cherry')).toBeNull();
   });
 
+  // #2078 — the panel is portaled to document.body and positioned fixed, so its
+  // scroll chain runs to the viewport, not to the sheet it visually sits in. On a
+  // phone a flick past either end of the list moved the page instead.
+  it('FE-COMP-SELECT-009: the option list keeps its scroll to itself', async () => {
+    const user = userEvent.setup();
+    render(<CustomSelect value="" onChange={onChange} options={OPTIONS} />);
+    await user.click(screen.getByRole('button'));
+
+    const list = screen.getByText('Apple').closest('div[style*="overflow"]') as HTMLElement;
+    expect(list.style.overscrollBehavior).toBe('contain');
+  });
+
+  it('FE-COMP-SELECT-010: it is still a bounded scroller, not a contained page', async () => {
+    const user = userEvent.setup();
+    render(<CustomSelect value="" onChange={onChange} options={OPTIONS} />);
+    await user.click(screen.getByRole('button'));
+
+    // Guards the other half: containment without a height cap would just make the
+    // panel grow off screen.
+    const list = screen.getByText('Apple').closest('div[style*="overflow"]') as HTMLElement;
+    expect(list.style.overflowY).toBe('auto');
+    expect(Number.parseInt(list.style.maxHeight, 10)).toBeGreaterThan(0);
+  });
+
   it('FE-COMP-SELECT-008: disabled state prevents the dropdown from opening', async () => {
     const user = userEvent.setup();
     render(<CustomSelect value="" onChange={onChange} options={OPTIONS} disabled={true} placeholder="Pick" />);

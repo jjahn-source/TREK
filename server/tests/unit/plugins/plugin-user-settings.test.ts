@@ -8,16 +8,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Reversible crypto stub so we can assert encrypt-at-rest without a real key env.
-vi.mock('../../../src/services/apiKeyCrypto', () => ({
+vi.mock('../../../src/nest/common/crypto/apiKeyCrypto', () => ({
   maybe_encrypt_api_key: (v: unknown) => (typeof v === 'string' ? `enc:${v}` : v),
   decrypt_api_key: (v: unknown) => (typeof v === 'string' && v.startsWith('enc:') ? v.slice(4) : v),
 }));
 
 const { getDb } = vi.hoisted(() => ({ getDb: { current: null as unknown } }));
 vi.mock('../../../src/db/database', () => ({ get db() { return getDb.current; } }));
+import { db as dbConn } from '../../../src/db/database';
+import { DatabaseService } from '../../../src/nest/database/database.service';
+import { AddonsService } from '../../../src/nest/addons/addons.service';
 
 import Database from 'better-sqlite3';
-import { PluginsService, readUserSettingDecrypted } from '../../../src/nest/plugins/plugins.service';
+import { PluginsService } from '../../../src/nest/plugins/plugins.service';
+import { PluginUserSettingsService } from '../../../src/nest/plugins/plugin-user-settings.service';
+/** The host-side settings reads, over the same connection the test seeded. */
+const userSettings = () => new PluginUserSettingsService(new DatabaseService(dbConn));
 
 function freshDb() {
   const d = new Database(':memory:');
@@ -35,7 +41,13 @@ function freshDb() {
 
 describe('per-user plugin settings', () => {
   let svc: PluginsService;
-  beforeEach(() => { getDb.current = freshDb(); svc = new PluginsService(); });
+  // AddonsService only feeds PluginsService.list(), which no case here calls, but it is a
+  // real collaborator on the same connection rather than a stand-in.
+  beforeEach(() => {
+    getDb.current = freshDb();
+    const dbs = new DatabaseService(dbConn);
+    svc = new PluginsService(dbs, new AddonsService(dbs));
+  });
 
   it('lists only the user-scope fields, in order', () => {
     const fields = svc.userSettingsFields('p');
@@ -48,14 +60,14 @@ describe('per-user plugin settings', () => {
     expect(masked.apiKey).toBe('••••••••');       // never echoed
     expect(masked.units).toBe('metric');
     // decrypted runtime read returns the real value; the stored form is ciphertext
-    expect(readUserSettingDecrypted('p', 42, 'apiKey')).toBe('sk-123');
+    expect(userSettings().readOne('p', 42, 'apiKey')).toBe('sk-123');
     expect(svc.getUserConfig('p', 42).apiKey).toBe('••••••••');
   });
 
   it('an unchanged secret (the mask) keeps the stored ciphertext', () => {
     svc.updateUserConfig('p', 42, { apiKey: 'sk-123' });
     svc.updateUserConfig('p', 42, { apiKey: '••••••••', units: 'imperial' }); // mask = untouched
-    expect(readUserSettingDecrypted('p', 42, 'apiKey')).toBe('sk-123'); // still the original
+    expect(userSettings().readOne('p', 42, 'apiKey')).toBe('sk-123'); // still the original
     expect(svc.getUserConfig('p', 42).units).toBe('imperial');
   });
 
@@ -70,6 +82,6 @@ describe('per-user plugin settings', () => {
   it('is per-user — one user cannot see another\'s value', () => {
     svc.updateUserConfig('p', 42, { units: 'metric' });
     expect(svc.getUserConfig('p', 99).units).toBeUndefined();
-    expect(readUserSettingDecrypted('p', 99, 'apiKey')).toBeUndefined();
+    expect(userSettings().readOne('p', 99, 'apiKey')).toBeUndefined();
   });
 });

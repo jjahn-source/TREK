@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { MapPin, Clock, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { MapPin, Clock, MoreHorizontal, Pencil, Trash2, Plus } from 'lucide-react'
 import { formatLocationName } from '../../utils/formatters'
 import { useTranslation } from '../../i18n'
 import { pluginsApi } from '../../api/client'
@@ -45,7 +45,7 @@ export function EntryCard({ entry, readOnly, onEdit, onDelete, onPhotoClick }: {
   const hasProscons = prosArr.length > 0 || consArr.length > 0
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl overflow-hidden transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-zinc-400 dark:hover:border-zinc-500 hover:shadow-sm">
+    <div className="bg-white dark:bg-zinc-900 rounded-[20px] overflow-hidden transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md" style={{ border: '1px solid var(--vg-line)' }}>
 
       {/* Hero area: photos with title overlay */}
       {photos.length > 0 ? (
@@ -73,15 +73,15 @@ export function EntryCard({ entry, readOnly, onEdit, onDelete, onPhotoClick }: {
           {/* Menu top-right */}
           {!readOnly && (
             <div className="absolute top-2.5 right-3 z-[2]">
-              <button ref={menuBtnRef} onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 rounded-[10px] bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50">
+              <button type="button" ref={menuBtnRef} onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 rounded-[10px] bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/50">
                 <MoreHorizontal size={14} />
               </button>
               {menuOpen && createPortal(
                 <>
-                  <div className="fixed inset-0 z-[99]" onClick={() => setMenuOpen(false)} />
+                  <div className="fixed inset-0 z-[99]" role="presentation" onClick={() => setMenuOpen(false)} />
                   <div className="fixed z-[100] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 min-w-[120px]" style={{ top: (menuBtnRef.current?.getBoundingClientRect().bottom || 0) + 4, right: window.innerWidth - (menuBtnRef.current?.getBoundingClientRect().right || 0) }}>
-                    <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-3 py-1.5 text-[12px] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center gap-2"><Pencil size={12} /> {t('common.edit')}</button>
-                    <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><Trash2 size={12} /> {t('common.delete')}</button>
+                    <button type="button" onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-3 py-1.5 text-[12px] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center gap-2"><Pencil size={12} /> {t('common.edit')}</button>
+                    <button type="button" onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><Trash2 size={12} /> {t('common.delete')}</button>
                   </div>
                 </>,
                 document.body,
@@ -113,15 +113,15 @@ export function EntryCard({ entry, readOnly, onEdit, onDelete, onPhotoClick }: {
           </div>
           {!readOnly && (
             <div className="relative">
-              <button ref={menuBtnRef} onClick={() => setMenuOpen(!menuOpen)} className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <button type="button" ref={menuBtnRef} onClick={() => setMenuOpen(!menuOpen)} className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                 <MoreHorizontal size={14} />
               </button>
               {menuOpen && createPortal(
                 <>
-                  <div className="fixed inset-0 z-[99]" onClick={() => setMenuOpen(false)} />
+                  <div className="fixed inset-0 z-[99]" role="presentation" onClick={() => setMenuOpen(false)} />
                   <div className="fixed z-[100] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 min-w-[120px]" style={{ top: (menuBtnRef.current?.getBoundingClientRect().bottom || 0) + 4, right: window.innerWidth - (menuBtnRef.current?.getBoundingClientRect().right || 0) }}>
-                    <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-3 py-1.5 text-[12px] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center gap-2"><Pencil size={12} /> {t('common.edit')}</button>
-                    <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><Trash2 size={12} /> {t('common.delete')}</button>
+                    <button type="button" onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-3 py-1.5 text-[12px] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center gap-2"><Pencil size={12} /> {t('common.edit')}</button>
+                    <button type="button" onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-3 py-1.5 text-[12px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><Trash2 size={12} /> {t('common.delete')}</button>
                   </div>
                 </>,
                 document.body,
@@ -185,22 +185,28 @@ export function SkeletonCard({ entry, onClick }: { entry: JourneyEntry; onClick?
   return (
     <div
       onClick={onClick}
-      className={`bg-white dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-[border-color,border-style] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${onClick ? 'hover:border-solid hover:border-zinc-400 dark:hover:border-zinc-500 cursor-pointer' : ''}`}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+      className={`rounded-[18px] px-3.5 py-3 flex items-center gap-3 transition-transform duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${onClick ? 'hover:-translate-y-0.5 cursor-pointer' : ''}`}
+      style={{ border: '1.5px dashed var(--vg-line2)', background: 'var(--vg-surf2)' }}
     >
-      <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 flex-shrink-0">
-        <MapPin size={14} />
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--vg-surf)', border: '1px solid var(--vg-line)', color: 'var(--vg-ink3)' }}>
+        <MapPin size={15} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] font-medium text-zinc-900 dark:text-white">
+        <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--vg-ink)' }}>
           {entry.title || t('journey.detail.newEntry')}
         </div>
-        <div className="text-[11px] text-zinc-500 mt-0.5">
+        <div className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--vg-ink3)' }}>
           {formatLocationName(entry.location_name)}{entry.entry_time ? ` · ${entry.entry_time}` : ''}
         </div>
       </div>
-      <div className="text-[11px] text-zinc-500 font-medium flex-shrink-0">
-        {t('journey.detail.addEntry')} &rarr;
-      </div>
+      {onClick && (
+        <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: 'var(--vg-ink)', color: 'var(--vg-bg)' }}>
+          <Plus size={12} strokeWidth={2.6} /> {t('journey.detail.addEntry')}
+        </span>
+      )}
     </div>
   )
 }
@@ -209,6 +215,9 @@ export function CheckinCard({ entry, onClick }: { entry: JourneyEntry; onClick?:
   return (
     <div
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
       className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] ${onClick ? 'hover:border-zinc-400 dark:hover:border-zinc-500 cursor-pointer' : ''}`}
     >
       <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">

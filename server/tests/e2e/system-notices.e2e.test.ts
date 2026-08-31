@@ -30,6 +30,7 @@ vi.mock('../../src/systemNotices/service', () => ({
 }));
 
 import { SystemNoticesModule } from '../../src/nest/system-notices/system-notices.module';
+import { DatabaseModule } from '../../src/nest/database/database.module';
 import { TrekExceptionFilter } from '../../src/nest/common/trek-exception.filter';
 
 const notice = {
@@ -42,7 +43,10 @@ describe('System-notices e2e (real auth guard + temp SQLite)', () => {
   let app: Awaited<ReturnType<typeof build>>;
 
   async function build() {
-    const moduleRef = await Test.createTestingModule({ imports: [SystemNoticesModule] }).compile();
+    // DatabaseModule is @Global in the real app; a partial graph has to
+    // provide it for SystemNoticesModule's AddonsModule import (the
+    // addons.e2e precedent).
+    const moduleRef = await Test.createTestingModule({ imports: [DatabaseModule, SystemNoticesModule] }).compile();
     const nest = moduleRef.createNestApplication();
     nest.use(cookieParser());
     nest.useGlobalFilters(new TrekExceptionFilter());
@@ -71,7 +75,7 @@ describe('System-notices e2e (real auth guard + temp SQLite)', () => {
     const res = await request(server).get('/api/system-notices/active').set('Cookie', sessionCookie(1));
     expect(res.status).toBe(200);
     expect(res.body).toEqual([notice]);
-    expect(mockGetActive).toHaveBeenCalledWith(1);
+    expect(mockGetActive).toHaveBeenCalledWith(1, expect.any(Function), false);
   });
 
   it('204 with no body on a successful dismiss', async () => {

@@ -13,6 +13,8 @@ const inspector: TranslationStrings = {
   'inspector.confirmedRes': 'Onaylanmış Rezervasyon',
   'inspector.pendingRes': 'Bekleyen Rezervasyon',
   'inspector.google': "Google Haritalar'da aç",
+  'inspector.navigation': 'Navigasyon',
+  'inspector.openWith': 'Şununla aç',
   'inspector.openStreetMap': 'OpenStreetMap',
   'inspector.saveToCollection': 'Koleksiyona kaydet',
   'inspector.savedToCollection': 'Kaydedildi',
@@ -21,5 +23,8 @@ const inspector: TranslationStrings = {
   'inspector.editRes': 'Rezervasyonu Düzenle',
   'inspector.participants': 'Katılımcılar',
   'inspector.trackStats': 'İstatistikleri Takip Et',
+  'inspector.trackColor': 'İz rengi',
+  'inspector.trackColorAuto': 'Otomatik renk',
+  'inspector.trackColorCustom': 'Özel renk seç',
 };
 export default inspector;

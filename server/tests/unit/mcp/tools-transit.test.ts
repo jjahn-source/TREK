@@ -1,6 +1,8 @@
 import { runMigrations } from '../../../src/db/migrations';
 import { createTables } from '../../../src/db/schema';
-import { invalidatePermissionsCache, savePermissions } from '../../../src/services/permissions';
+import { invalidatePermissionsCache } from '../../../src/nest/permissions/permissions-cache';
+import { PermissionsService } from '../../../src/nest/permissions/permissions.service';
+import { DatabaseService } from '../../../src/nest/database/database.service';
 import { addTripMember, createDay, createTrip, createUser } from '../../helpers/factories';
 import { createMcpHarness, parseToolResult, type McpHarness } from '../../helpers/mcp-harness';
 import { resetTestDb } from '../../helpers/test-db';
@@ -28,29 +30,38 @@ const { testDb, dbMock } = vi.hoisted(() => {
   return { testDb: db, dbMock: mock };
 });
 
-const { geocodeMock, planMock, broadcastMock, notifyBookingChangeMock } = vi.hoisted(() => ({
-  geocodeMock: vi.fn(),
-  planMock: vi.fn(),
+const { broadcastMock } = vi.hoisted(() => ({
   broadcastMock: vi.fn(),
-  notifyBookingChangeMock: vi.fn(),
 }));
 
 vi.mock('../../../src/db/database', () => dbMock);
-vi.mock('../../../src/services/transitService', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/services/transitService')>()),
-  geocode: geocodeMock,
-  plan: planMock,
-}));
 vi.mock('../../../src/websocket', () => ({ broadcast: broadcastMock }));
-vi.mock('../../../src/services/reservationService', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/services/reservationService')>()),
-  notifyBookingChange: notifyBookingChangeMock,
-}));
 vi.mock('../../../src/config', () => ({
   JWT_SECRET: 'test-jwt-secret-for-trek-testing-only',
   ENCRYPTION_KEY: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2',
   updateJwtSecret: () => {},
 }));
+
+import { ReservationsService } from '../../../src/nest/reservations/reservations.service';
+import type { TransitPlace } from '../../../src/nest/transit/transit.helpers';
+import { TransitService } from '../../../src/nest/transit/transit.service';
+
+// savePermissions is no longer bridged; write through a service instance — the
+// permissions cache is module-scoped, so the MCP _shared checkPermission path
+// sees the write immediately.
+const permissionsService = new PermissionsService(new DatabaseService(testDb));
+const savePermissions = permissionsService.savePermissions.bind(permissionsService);
+
+// The transit tools live on the DI-discovered transit.mcp.ts since the transit
+// fold; the test registry builds a real TransitService (and injects a real
+// ReservationsService over the mocked db proxy), so stub the provider methods
+// on the prototype (no auto-restore in the vitest config — these survive
+// across tests, exactly like the old module mocks did).
+const geocodeMock = vi.spyOn(TransitService.prototype, 'geocode');
+const planMock = vi.spyOn(TransitService.prototype, 'plan');
+const notifyBookingChangeMock = vi
+  .spyOn(ReservationsService.prototype, 'notifyBookingChange')
+  .mockImplementation(() => {});
 
 const from = { name: 'Namba', lat: 34.667, lng: 135.501 };
 const to = { name: 'Umeda', lat: 34.702, lng: 135.496 };
@@ -118,7 +129,8 @@ beforeEach(() => {
   geocodeMock.mockReset();
   planMock.mockReset();
   broadcastMock.mockReset();
-  notifyBookingChangeMock.mockReset();
+  // mockReset would fall back to the real notification write — keep it stubbed.
+  notifyBookingChangeMock.mockReset().mockImplementation(() => {});
   delete process.env.DEMO_MODE;
   invalidatePermissionsCache();
 });
@@ -154,7 +166,10 @@ describe('MCP transit tools', () => {
 
   it('forwards stop and route searches and replaces provider endpoint names', async () => {
     const { user } = createUser(testDb);
-    geocodeMock.mockResolvedValue({ results: [from] });
+    // `from` is a tool-input place (name/lat/lng). A geocode result is a TransitPlace,
+    // which also carries `type` and `area`; the stop search only reads the name back out,
+    // so the fixture stays as it is instead of growing fields nothing here looks at.
+    geocodeMock.mockResolvedValue({ results: [from as TransitPlace] });
     planMock.mockResolvedValue({
       itineraries: [
         itinerary,

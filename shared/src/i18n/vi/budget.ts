@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Xóa khoản chi?',
+  'costs.confirm.deleteBody': '"{name}" sẽ bị xóa vĩnh viễn.',
   'budget.title': 'Ngân sách',
   'budget.exportCsv': 'Xuất CSV',
   'budget.emptyTitle': 'Chưa có ngân sách nào được tạo',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Hoàn tác',
   'costs.whatFor': 'Nó dùng để làm gì?',
   'costs.namePlaceholder': 'ví dụ. Ăn tối, quà lưu niệm, xăng…',
+  'costs.note': 'Ghi chú',
+  'costs.notePlaceholder': 'Khoản này gồm những gì, ai nợ bao nhiêu…',
+  'costs.addNote': 'Thêm ghi chú',
+  'costs.showNote': 'Hiện ghi chú',
+  'costs.hideNote': 'Ẩn ghi chú',
   'costs.totalAmount': 'Tổng số tiền',
   'costs.currency': 'Tiền tệ',
   'costs.day': 'Ngày',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Phí & vé',
   'costs.cat.health': 'Sức khỏe',
   'costs.cat.tips': 'Mẹo',
+  'costs.cat.fuel': 'Nhiên liệu',
+  'costs.cat.parking': 'Bãi đỗ xe',
   'costs.cat.other': 'Khác',
   'costs.daysCount': '{count} ngày',
   'costs.travelers': '{count} người',
@@ -129,6 +138,14 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Tất cả danh mục',
   'costs.filter.allDays': 'Tất cả các ngày',
   'costs.expensesCount': '{count} chi phí',
+  'costs.ticketItemName': 'Tên món',
+  'costs.ticketSplitting': 'Chia cho:',
+  'costs.ticketAddItem': 'Thêm món',
+  'costs.ticketShares': 'Phần của từng người',
+  'costs.excluded': 'Không tính',
+  'costs.splitBalanced': 'Phần chia khớp với tổng',
+  'costs.splitSumUnder': 'Tổng các phần: {sum} trên {total} (thiếu {diff})',
+  'costs.splitSumOver': 'Tổng các phần: {sum} trên {total} (thừa {diff})',
 };
 
 export default budget;

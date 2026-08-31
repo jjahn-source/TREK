@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Gider silinsin mi?',
+  'costs.confirm.deleteBody': '"{name}" kalıcı olarak silinecek.',
   'budget.title': 'Bütçe',
   'budget.exportCsv': 'CSV dışa aktar',
   'budget.emptyTitle': 'Henüz bütçe oluşturulmadı',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Geri al',
   'costs.whatFor': 'Ne içindi?',
   'costs.namePlaceholder': 'örn. Akşam yemeği, hediyelik, benzin…',
+  'costs.note': 'Not',
+  'costs.notePlaceholder': 'Neyi kapsadığı, kimin ne borcu olduğu…',
+  'costs.addNote': 'Not ekle',
+  'costs.showNote': 'Notu göster',
+  'costs.hideNote': 'Notu gizle',
   'costs.totalAmount': 'Toplam tutar',
   'costs.currency': 'Para birimi',
   'costs.day': 'Gün',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Ücretler & biletler',
   'costs.cat.health': 'Sağlık',
   'costs.cat.tips': 'Bahşişler',
+  'costs.cat.fuel': 'Yakıt',
+  'costs.cat.parking': 'Otopark',
   'costs.cat.other': 'Diğer',
   'costs.daysCount': '{count} gün',
   'costs.travelers': '{count} yolcu',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Tüm kategoriler',
   'costs.filter.allDays': 'Tüm günler',
   'costs.expensesCount': '{count} harcama',
+  'costs.ticketItemName': 'Kalem adı',
+  'costs.ticketSplitting': 'Bölüşülüyor:',
+  'costs.ticketAddItem': 'Kalem ekle',
+  'costs.ticketShares': 'Kişi başı pay',
+  'costs.excluded': 'Dahil değil',
+  'costs.splitBalanced': 'Bölüşüm toplamla eşleşiyor',
+  'costs.splitSumUnder': 'Payların toplamı: {total} tutarın {sum} kadarı ({diff} eksik)',
+  'costs.splitSumOver': 'Payların toplamı: {total} tutarın {sum} kadarı ({diff} fazla)',
 };
 export default budget;

@@ -23,7 +23,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Šablona mapy',
   'settings.mapTemplatePlaceholder.select': 'Vyberte šablonu...',
   'settings.mapDefaultHint': 'Ponechte prázdné pro OpenStreetMap (výchozí)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'URL šablony pro mapové dlaždice',
   'settings.mapProvider': 'Poskytovatel mapy',
   'settings.mapProviderHint': 'Ovlivňuje mapy v Trip Planneru a Journey. Atlas vždy používá Leaflet.',
@@ -34,6 +33,11 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox přístupový token',
   'settings.mapMapboxTokenHint': 'Veřejný token (pk.*) z',
   'settings.mapMapboxTokenLink': 'mapbox.com → Přístupové tokeny',
+  'settings.mapCartoKey': 'CARTO API klíč',
+  'settings.mapCartoKeyHint': 'Podkladové mapy CARTO se bez klíče zobrazují s vodoznakem. Zdarma a bez účtu, na',
+  'settings.mapCartoKeyLink': 'carto.com API klíč pro podkladové mapy',
+  'settings.mapCartoKeyMissing':
+    'Tato šablona je podkladová mapa CARTO. Bez klíče CARTO vypálí do každé dlaždice nápis "API KEY REQUIRED". Dokud klíč nezadáte, TREK zobrazuje výchozí podkladovou mapu.',
   'settings.mapStyle': 'Styl mapy',
   'settings.mapStylePlaceholder': 'Vyberte styl Mapbox',
   'settings.mapStyleHint': 'Preset nebo vaše vlastní URL mapbox://styles/USER/ID',
@@ -77,6 +81,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Připomínky cest',
   'settings.notifyTodoDue': 'Úkol se blíží',
   'settings.notifyVacayInvite': 'Pozvánky k propojení Vacay',
+  'settings.notifyVacayShare': 'Sdílení kalendáře Vacay',
   'settings.notifyPhotosShared': 'Sdílené fotky (Immich)',
   'settings.notifyCollabMessage': 'Zprávy v chatu (Collab)',
   'settings.notifyPackingTagged': 'Seznam balení: přiřazení',
@@ -180,6 +185,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Navrhnout funkci',
   'settings.about.featureRequestHint': 'Navrhněte novou funkci',
   'settings.about.wikiHint': 'Dokumentace a návody',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Měsíční podporovatelé',
   'settings.about.supporters.title': 'Společníci na cestě s TREK',
   'settings.about.supporters.subtitle':
@@ -230,6 +239,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Profilový obrázek byl aktualizován',
   'settings.avatarRemoved': 'Profilový obrázek byl odstraněn',
   'settings.avatarError': 'Nahrávání se nezdařilo',
+  'settings.avatarRemoveError': 'Odstranění se nezdařilo',
   'settings.mfa.title': 'Dvoufaktorové ověření (2FA)',
   'settings.mfa.description':
     'Přidá druhý stupeň zabezpečení při přihlašování e-mailem a heslem. Použijte aplikaci (Google Authenticator, Authy apod.).',
@@ -293,8 +303,9 @@ const settings: TranslationStrings = {
   'settings.notificationPreferences.webhook': 'Webhook',
   'settings.notificationPreferences.email': 'Email',
   'settings.notificationPreferences.ntfy': 'Ntfy',
-  'settings.currency': 'Currency',
-  'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currency': 'Zobrazovaná měna',
+  'settings.currencyHint':
+    'Částky v Nákladech se do této měny přepočítávají pouze pro zobrazení – původní částky zůstávají beze změny.',
   'settings.currencyTrip': 'Měna cesty',
   'settings.passkey.title': 'Přístupové klíče',
   'settings.passkey.description':
@@ -342,11 +353,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Připojení selhalo',
   'settings.aiParsing.title': 'Zpracování pomocí AI',
   'settings.aiParsing.hint':
-    'Použijte vlastní model AI k získání rezervací z nahraných souborů. Platí pouze tehdy, když správce nenastavil model pro celou instanci.',
+    'Vyberte model AI pro získání rezervací z nahraných souborů. Platí pouze tehdy, když správce nenastavil model pro celou instanci.',
   'settings.aiParsing.provider': 'Poskytovatel',
   'settings.aiParsing.providerLocal': 'Místní (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'Místní koncový bod (Ollama) se nastavuje jednou pro celou instanci ve správcovském nastavení. Vlastní klíč OpenAI nebo Anthropic tu můžete používat i nadále.',
   'settings.aiParsing.model': 'Model',
   'settings.aiParsing.baseUrl': 'Základní URL',
   'settings.aiParsing.baseUrlHint': 'Kde model běží — místní server Ollama nebo koncový bod kompatibilní s OpenAI.',
@@ -421,8 +434,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Dolní navigační lišta',
+  'settings.appearance.mobileNav.hint':
+    'Vyberte, které položky se zobrazí v liště a které budou v nabídce „Více“. Dashboard zůstává vždy na prvním místě.',
+  'settings.appearance.mobileNav.inBar': 'V liště',
+  'settings.appearance.mobileNav.underMore': 'V nabídce „Více“',
+  'settings.appearance.mobileNav.moreEmpty': 'Zatím tu nic není — vše se vejde do lišty.',
+  'settings.appearance.mobileNav.pinned': 'Připnuto',
+  'settings.appearance.mobileNav.toMore': 'Přesunout do nabídky „Více“',
+  'settings.appearance.mobileNav.toBar': 'Přesunout do lišty',
+  'settings.appearance.dashOrder': 'Pořadí na nástěnce',
+  'settings.appearance.dashOrder.hint':
+    'Změňte pořadí, ve kterém se na nástěnce v telefonu řadí seznam cest a widgety. Vybraná cesta zůstává vždy nahoře.',
+  'settings.appearance.dashOrder.trips': 'Cesty',
+  'settings.appearance.dashOrder.hidden': 'Skryto',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': 'Spuštění',
+  'settings.startPage': 'Úvodní stránka',
+  'settings.startPageDashboard': 'Přehled',
+  'settings.startPageActiveTrip': 'Aktivní cesta',
+  'settings.startPageHint':
+    'TREK se otevře rovnou na cestě, která právě probíhá, jinak na nejbližší nadcházející. Je to táž cesta, kterou zvýrazňuje přehled.',
+  'settings.startTripTab': 'Úvodní karta',
+  'settings.startTripTabHint':
+    'Karta, kterou se cesta otevře. Pokud patří k vypnutému doplňku, otevře se místo ní plán.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': 'Offline mezipaměť',
@@ -486,7 +522,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': 'Kdy',
   'settings.pluginActivity.columns.status': 'Výsledek',
   'settings.alwaysShowRoutes': 'Vždy zobrazovat trasy rezervací',
-  'settings.alwaysShowRoutesHint': 'Automaticky zobrazí na mapě trasu každého letu, vlaku a jiné rezervace, aniž byste ji museli zapínat jednotlivě.',
+  'settings.alwaysShowRoutesHint':
+    'Automaticky zobrazí na mapě trasu každého letu, vlaku a jiné rezervace, aniž byste ji museli zapínat jednotlivě.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'Klíče API',
+  'settings.apiKeys.description': 'Klíče pro veřejné API, aby jiný software mohl číst tvoje cesty. Jen pro čtení: klíč nemůže nic měnit ani mazat.',
+  'settings.apiKeys.create': 'Vytvořit klíč',
+  'settings.apiKeys.empty': 'Zatím žádné klíče. Vytvoř jeden a připoj další software.',
+  'settings.apiKeys.createdAt': 'vytvořen',
+  'settings.apiKeys.usedAt': 'naposledy použit',
+  'settings.apiKeys.deleteTitle': 'Smazat klíč',
+  'settings.apiKeys.deleteMessage': 'Vše, co tento klíč používá, okamžitě přestane fungovat. Akci nelze vrátit zpět.',
+  'settings.apiKeys.deleted': 'Klíč smazán',
+  'settings.apiKeys.deleteFailed': 'Klíč se nepodařilo smazat',
+  'settings.apiKeys.createFailed': 'Klíč se nepodařilo vytvořit',
+  'settings.apiKeys.copy': 'Kopírovat',
+  'settings.apiKeys.docsHint': 'Pošli klíč jako "Authorization: Bearer ..." nebo "X-API-Key: ..." na /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Vytvořit klíč API',
+  'settings.apiKeys.modal.name': 'Název',
+  'settings.apiKeys.modal.namePlaceholder': 'např. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Jen pro tebe, abys klíč později poznal.',
+  'settings.apiKeys.modal.creating': 'Vytváří se...',
+  'settings.apiKeys.modal.create': 'Vytvořit',
+  'settings.apiKeys.modal.createdTitle': 'Klíč API vytvořen',
+  'settings.apiKeys.modal.createdWarning': 'Zkopíruj klíč hned teď. Zobrazí se jen jednou a později ho už nelze získat.',
+  'settings.apiKeys.modal.done': 'Hotovo',
 };
 
 export default settings;

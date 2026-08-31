@@ -47,6 +47,23 @@ describe('OpenAiCompatibleClient', () => {
     expect(out).toEqual([{ '@type': 'TrainReservation' }]);
   });
 
+  it('tolerates single-quoted, non-strict JSON output (Gemini, #1638)', async () => {
+    mockFetch(() =>
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content:
+                "[{ '@type': 'LodgingReservation', checkinTime: '2026-08-28T00:00:00', price: 146.25, }]",
+            },
+          },
+        ],
+      }),
+    );
+    const out = await new OpenAiCompatibleClient().extract(baseInput);
+    expect(out).toEqual([{ '@type': 'LodgingReservation', checkinTime: '2026-08-28T00:00:00', price: 146.25 }]);
+  });
+
   it('returns [] on malformed content', async () => {
     mockFetch(() => jsonResponse({ choices: [{ message: { content: 'not json' } }] }));
     expect(await new OpenAiCompatibleClient().extract(baseInput)).toEqual([]);
@@ -74,6 +91,33 @@ describe('OpenAiCompatibleClient', () => {
     expect(second.response_format).toEqual({ type: 'json_object' });
     expect(second.messages).toEqual(first.messages);
     expect(second.model).toBe(first.model);
+  });
+
+  it('retries with max_completion_tokens when the model rejects max_tokens (400, #1760)', async () => {
+    safeFetchLlmMock
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: { message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.", code: 'unsupported_parameter' } },
+          false,
+          400,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ choices: [{ message: { content: '{"reservations":[{"@type":"FlightReservation"}]}' } }] }),
+      );
+    const out = await new OpenAiCompatibleClient().extract(baseInput);
+    expect(out).toEqual([{ '@type': 'FlightReservation' }]);
+    expect(safeFetchLlmMock).toHaveBeenCalledTimes(2);
+
+    const first = JSON.parse((safeFetchLlmMock.mock.calls[0][1] as RequestInit).body as string);
+    const second = JSON.parse((safeFetchLlmMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(first.max_tokens).toBe(4096);
+    expect(first.max_completion_tokens).toBeUndefined();
+    // The retry swaps the token param but keeps everything else, json_schema included.
+    expect(second.max_completion_tokens).toBe(4096);
+    expect(second.max_tokens).toBeUndefined();
+    expect(second.response_format.type).toBe('json_schema');
+    expect(second.messages).toEqual(first.messages);
   });
 
   it('throws when the json_object retry also fails (400 twice)', async () => {
@@ -163,6 +207,36 @@ describe('AnthropicClient', () => {
     const body = JSON.parse((fetchFn.mock.calls[0][1] as RequestInit).body as string);
     expect(body.tool_choice).toEqual({ type: 'tool', name: 'emit_reservations' });
     expect(body.tools[0].name).toBe('emit_reservations');
+  });
+
+  /*
+   * The model does not always send its tool input as the array the schema
+   * declares — sometimes it sends the same thing JSON-encoded, in one of two
+   * shapes. The old check only accepted arrays, so a good extraction was
+   * discarded and the import reported "no reservations found" with nothing in
+   * the log: exactly what a document containing no booking produces. Whether it
+   * happened came down to how the model serialised that particular call, so the
+   * same file behaved differently between attempts (#1968).
+   */
+  it('reads a tool input the model sent as a stringified array', async () => {
+    mockFetch(() =>
+      jsonResponse({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'emit_reservations', input: { reservations: JSON.stringify([{ '@type': 'LodgingReservation' }]) } }] }),
+    );
+    expect(await new AnthropicClient().extract(baseInput)).toEqual([{ '@type': 'LodgingReservation' }]);
+  });
+
+  it('reads one the model stringified and wrapped again', async () => {
+    mockFetch(() =>
+      jsonResponse({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'emit_reservations', input: { reservations: JSON.stringify({ reservations: [{ '@type': 'FlightReservation' }] }) } }] }),
+    );
+    expect(await new AnthropicClient().extract(baseInput)).toEqual([{ '@type': 'FlightReservation' }]);
+  });
+
+  it('still answers empty when the tool input really is not a list', async () => {
+    mockFetch(() =>
+      jsonResponse({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'emit_reservations', input: { reservations: 'no bookings in this document' } }] }),
+    );
+    expect(await new AnthropicClient().extract(baseInput)).toEqual([]);
   });
 
   it('throws on a refusal stop_reason', async () => {

@@ -163,6 +163,9 @@ const admin: TranslationStrings = {
   'admin.placesDetails.title': 'Place Details',
   'admin.placesDetails.subtitle':
     'Fetch detailed place information (hours, rating, website) from the Google Places API. Disable to save API quota.',
+  'admin.placesEnrich.title': 'Place Enrichment',
+  'admin.placesEnrich.subtitle':
+    'Show pictures and a description while adding a place. Wikipedia and OpenStreetMap are always used; Google is added on top when Place Photos or Place Details are on.',
   'admin.bagTracking.title': 'Bag Tracking',
   'admin.bagTracking.subtitle': 'Enable weight and bag assignment for packing items',
   'admin.collab.chat.title': 'Chat',
@@ -194,6 +197,9 @@ const admin: TranslationStrings = {
   'admin.defaultSettings.mapboxStylePlaceholder': 'Choose a style…',
   'admin.defaultSettings.mapbox3d': '3D buildings & terrain',
   'admin.defaultSettings.mapboxQuality': 'High-quality mode',
+  'admin.defaultSettings.cartoKey': 'Shared CARTO key',
+  'admin.defaultSettings.cartoKeyHint':
+    'Used for every user who has not entered their own key, so the whole instance gets CARTO tiles without a watermark. Stored encrypted.',
   'admin.tabs.templates': 'Packing Templates',
   'admin.packingTemplates.title': 'Packing Templates',
   'admin.packingTemplates.subtitle': 'Create reusable packing lists for your trips',
@@ -211,9 +217,12 @@ const admin: TranslationStrings = {
   'admin.packingTemplates.loadError': 'Failed to load templates',
   'admin.packingTemplates.createError': 'Failed to create template',
   'admin.packingTemplates.deleteError': 'Failed to delete template',
+  'admin.packingTemplates.deleteCategoryError': 'Failed to delete category',
+  'admin.packingTemplates.deleteItemError': 'Failed to delete item',
   'admin.packingTemplates.saveError': 'Failed to save',
   'admin.tabs.addons': 'Addons',
   'admin.tabs.plugins': 'Plugins',
+  'admin.tabs.storage': 'Storage',
   'admin.plugins.rescan': 'Rescan',
   'admin.plugins.rescanned': 'Rescanned the plugins folder',
   'admin.plugins.upload': 'Upload plugin',
@@ -240,7 +249,7 @@ const admin: TranslationStrings = {
   'admin.plugins.errorLog': 'Error log',
   'admin.plugins.allowedHosts': 'Allowed hosts',
   'admin.plugins.allowedHosts.hint':
-    'This plugin talks to a service only you can name (a self-hosted server). Add the hosts it may reach — it can reach no others.',
+    'This plugin talks to a service only you can name. Add the hosts it may reach — it can reach no others.',
   'admin.plugins.allowedHosts.none': 'No hosts added yet.',
   'admin.plugins.allowedHosts.unsupported':
     'This plugin does not use operator-supplied hosts. Its allowed hosts are fixed in its manifest.',
@@ -249,7 +258,7 @@ const admin: TranslationStrings = {
   'admin.plugins.allowedHosts.count': '{n} allowed host(s)',
   'admin.plugins.operatorEgressPill': '+ hosts you add',
   'admin.plugins.operatorEgressHint':
-    'This plugin talks to a service only you can name (a self-hosted server). After installing, add the hosts it may reach under ⋯ → Allowed hosts. It can reach no others.',
+    'This plugin talks to a service only you can name. After installing, add the hosts it may reach under ⋯ → Allowed hosts. It can reach no others.',
   'admin.plugins.noErrors': 'No errors logged.',
   'admin.plugins.uninstalled': 'Plugin uninstalled',
   'admin.plugins.uninstallTitle': 'Uninstall plugin?',
@@ -266,6 +275,7 @@ const admin: TranslationStrings = {
   'admin.plugins.updateTo': 'Update → v{version}',
   'admin.plugins.enabledToggle': 'Enable plugin',
   'plugins.notFound': 'Plugin not found',
+  'plugins.frameLoadFailed': 'This plugin could not be loaded.',
   'admin.plugins.title': 'Plugins',
   'admin.plugins.subtitle': 'Install and manage third-party plugins on your instance.',
   'admin.plugins.disabledTitle': 'Plugins are disabled',
@@ -312,7 +322,7 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.db:write:vacay':
     "Toggle vacation days and company holidays on the acting user's active plan (needs the Vacay addon)",
   'admin.plugins.perm.db:write:journal':
-    'Create, edit and delete journal entries on journeys the acting user can edit (needs the Journey addon)',
+    'Create, edit and delete journal entries, and attach photos to them, on journeys the acting user can edit (needs the Journey addon)',
   'admin.plugins.perm.db:write:collections':
     "Create and edit collections and save places to them, with the acting user's collection role (needs the Collections addon)",
   'admin.plugins.perm.db:write:files':
@@ -354,6 +364,20 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.hook:trip-warning-provider': 'Raise validation warnings on a trip (shown in the planner)',
   'admin.plugins.perm.hook:table-contributor': 'Add columns and actions to trip views (reservations, places, days)',
   'admin.plugins.perm.hook:map-marker-provider': 'Add markers to the trip map (e.g. show bookings or POIs)',
+  'admin.plugins.perm.hook:map-layer-provider': 'Draw routes, corridors and zones on the trip map',
+  'admin.plugins.perm.hook:route-provider':
+    'Offer routing profiles the planner can route days with (e.g. EV routing with charging stops)',
+  'admin.plugins.perm.hook:day-schedule-provider':
+    'Attach time entries to the day plan (charging stops, security buffers)',
+  'admin.plugins.perm.hook:day-tint-provider':
+    'Colour-code days in the day plan (e.g. which leg of the trip a day belongs to)',
+  'admin.plugins.cap.mcpTools': 'Publishes AI tools',
+  'admin.plugins.mcpToolsTitle': 'AI tools it publishes',
+  'admin.plugins.mcpToolsHint': 'An assistant can run these on a user’s behalf. Each one acts with the access granted above.',
+  'admin.plugins.perm.mcp:tools':
+    'Publish tools that an AI assistant can run on your behalf (it acts with the access you grant the plugin here, not with the assistant’s own)',
+  'admin.plugins.perm.geolocation:read':
+    "Ask for your live position while one of its views is open (TREK reads it under this site's location permission, not the plugin's own)",
   'admin.plugins.perm.hook:pdf-section-provider': 'Append text sections to the trip PDF export',
   'admin.plugins.perm.hook:atlas-layer-provider':
     'Highlight countries on the Atlas world map (e.g. wishlists or travel advisories)',
@@ -443,7 +467,20 @@ const admin: TranslationStrings = {
   'admin.plugins.sortUpdates': 'Updates first',
   'admin.plugins.sortDownloads': 'Most downloads',
   'admin.plugins.updatesAvailable': '{count} updates available for your plugins.',
+  'admin.plugins.newerNeedsTrek': 'v{version} available — needs TREK {range}',
   'admin.plugins.updateAll': 'Update all',
+  'admin.plugins.versionsTitle': 'Versions',
+  'admin.plugins.versionPickerTitle': 'Change version — {name}',
+  'admin.plugins.versionSwitch': 'Switch to {version}',
+  'admin.plugins.versionNeedsTrek': 'needs TREK {range}',
+  'admin.plugins.changeVersion': 'Change version…',
+  'admin.plugins.noVersions': 'No published versions found in the registry.',
+  'admin.plugins.downgradeTitle': 'Roll back this plugin?',
+  'admin.plugins.downgradeBody': 'Switching from v{from} to v{to}: data written by the newer version stays in place, and the older version may not understand it.',
+  'admin.plugins.downgradeConfirm': 'Roll back',
+  'admin.plugins.updatesHeld': 'Updates paused at v{version}',
+  'admin.plugins.resumeUpdates': 'Resume updates',
+  'admin.plugins.updatesResumed': 'Updates resumed',
   'admin.plugins.noMatchInstalled': 'No installed plugins match your search.',
   'admin.plugins.noMatchRegistry': 'No plugins in the registry match your search.',
   'admin.plugins.restart': 'Restart',
@@ -471,6 +508,11 @@ const admin: TranslationStrings = {
   'admin.plugins.cap.calendar': 'Provides calendar events',
   'admin.plugins.cap.placeDetails': 'Enriches places',
   'admin.plugins.cap.warnings': 'Flags issues',
+  'admin.plugins.cap.mapLayers': 'Draws on the map',
+  'admin.plugins.cap.routing': 'Offers routing',
+  'admin.plugins.cap.daySchedule': 'Adds plan times',
+  'admin.plugins.cap.dayTint': 'Tints days',
+  'admin.plugins.cap.geolocation': 'Reads your position',
   'admin.plugins.cap.events': 'Reacts to activity',
   'admin.plugins.cap.requiresAddon': 'Requires {addon}',
   'admin.plugins.cap.dependsOn': 'Needs {id} {version}',

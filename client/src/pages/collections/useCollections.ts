@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 import { useTranslation } from '../../i18n'
 import { useElementSize } from '../../hooks/useElementSize'
 import { useElementRect } from '../../hooks/useElementRect'
@@ -50,15 +50,15 @@ export function useCollections() {
   const store = useCollectionStore()
   const {
     collections, activeId, places, members, labels, incomingInvites,
-    view, statusFilter, categoryFilter, labelFilter, search, selectedPlaceId, selectMode, selectedIds,
+    view, statusFilter, categoryFilter, ratingFilter, labelFilter, sortMode, search, selectedPlaceId, selectMode, selectedIds,
     loading, placesLoading,
     loadAll, setActive, refreshActive, loadCollection,
     deleteCollection,
-    setStatus, updatePlace, deletePlace, deleteMany, copyToTrip, clearSelection,
+    setStatus, updatePlace, uploadPlaceImage, ratePlace, deletePlace, deleteMany, copyToTrip, clearSelection,
     moveToList, duplicateToList, setSelectedIds,
     createLabel, updateLabel, deleteLabel, assignLabels,
     acceptInvite, declineInvite,
-    setView, setStatusFilter, setCategoryFilter, setLabelFilter, setSearch, setSelectedPlaceId, setSelectMode, toggleSelect,
+    setView, setStatusFilter, setCategoryFilter, setRatingFilter, setLabelFilter, setSortMode, setSearch, setSelectedPlaceId, setSelectMode, toggleSelect,
   } = store
 
   // ── Page-local UI state ─────────────────────────────────────────────
@@ -68,6 +68,7 @@ export function useCollections() {
   const [mobileRailOpen, setMobileRailOpen] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [showAddPlace, setShowAddPlace] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   // The place ids the Copy-to-trip modal is open for (null = closed). Single
   // place from the detail panel, or the select-mode set for a bulk copy.
   const [copyIds, setCopyIds] = useState<number[] | null>(null)
@@ -167,8 +168,8 @@ export function useCollections() {
 
   // Labels are per-collection, so never apply them on the "All saved" union.
   const visiblePlaces = useMemo(
-    () => sortPlaces(filterPlaces(places, statusFilter, search, categoryFilter, isAllSaved ? [] : labelFilter)),
-    [places, statusFilter, search, categoryFilter, isAllSaved, labelFilter],
+    () => sortPlaces(filterPlaces(places, statusFilter, search, categoryFilter, isAllSaved ? [] : labelFilter, ratingFilter), sortMode),
+    [places, statusFilter, search, categoryFilter, isAllSaved, labelFilter, ratingFilter, sortMode],
   )
   // Categories actually present in this list, for the category filter dropdown.
   const categoryOptions = useMemo(() => presentCategories(places), [places])
@@ -177,6 +178,11 @@ export function useCollections() {
   // Stable reference so the map doesn't tear down + rebuild every marker on each
   // unrelated re-render (which would swallow marker clicks mid-rebuild).
   const mappable = useMemo(() => mappablePlaces(visiblePlaces), [visiblePlaces])
+  // Whether this list has anything mappable AT ALL, filters aside. The layout
+  // hangs off this rather than off `mappable`: a label with no places left the
+  // filtered set empty, which tore the map out and reflowed the page to full
+  // width. The filter should empty the map, not remove it.
+  const hasMappable = useMemo(() => mappablePlaces(places).length > 0, [places])
   const counts = useMemo(() => statusCounts(places), [places])
 
   // ── Handlers ────────────────────────────────────────────────────────
@@ -220,6 +226,14 @@ export function useCollections() {
       toast.error(getApiErrorMessage(err, t('common.error')))
     }
   }, [deletePlace, toast, t])
+
+  const handleRatePlace = useCallback(async (placeId: number, rating: number | null) => {
+    try {
+      await ratePlace(placeId, rating)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, t('common.error')))
+    }
+  }, [ratePlace, toast, t])
 
   const handleDeleteSelected = useCallback(async () => {
     if (selectedIds.length === 0) return
@@ -377,19 +391,20 @@ export function useCollections() {
     collections, ownedLists, sharedLists, activeCollection, isAllSaved, isOwner,
     myRole, canEdit, canDelete,
     canShare, shareMemberCount,
-    activeId, places, visiblePlaces, mappable, members, incomingInvites, counts,
-    view, statusFilter, categoryFilter, categoryOptions, search, selectedPlaceId, selectMode, selectedIds,
+    activeId, places, visiblePlaces, mappable, hasMappable, members, incomingInvites, counts,
+    view, statusFilter, categoryFilter, categoryOptions, ratingFilter, sortMode, search, selectedPlaceId, selectMode, selectedIds,
     labels, labelFilter, labelOptions,
     loading, placesLoading,
     // store setters
-    setView, setStatusFilter, setCategoryFilter, setLabelFilter, setSearch, setSelectedPlaceId, setSelectMode, toggleSelect,
-    updatePlace,
+    setView, setStatusFilter, setCategoryFilter, setRatingFilter, setLabelFilter, setSortMode, setSearch, setSelectedPlaceId, setSelectMode, toggleSelect,
+    updatePlace, uploadPlaceImage,
     // labels
     showLabelManager, setShowLabelManager, labelPickerOpen, setLabelPickerOpen,
     handleCreateLabel, handleUpdateLabel, handleDeleteLabel, handleBulkAssignLabels, handleAssignPlaceLabels,
     // local UI state
     editorTarget, setEditorTarget, handleEditorCreated,
     showAddPlace, setShowAddPlace, handlePlaceAdded,
+    showImport, setShowImport,
     confirmDeleteList, setConfirmDeleteList,
     mobileRailOpen, setMobileRailOpen,
     showShare, setShowShare, handleAfterLeave,
@@ -399,7 +414,7 @@ export function useCollections() {
     copyIds, openCopyForSelectedPlace, openCopyForSelection, closeCopy, handleCopyToTrip,
     // handlers
     handleSelectList, handleDeleteList,
-    handleStatusChange, handleDeletePlace, handleDeleteSelected,
+    handleStatusChange, handleRatePlace, handleDeletePlace, handleDeleteSelected,
     handleAcceptInvite, handleDeclineInvite,
     allVisibleSelected, handleSelectAll,
     listPickerMode, setListPickerMode, handleMoveToList, handleDuplicateToList,

@@ -1,6 +1,6 @@
 # Collections
 
-Collections is a personal, server-wide library of saved places that lives outside of any single trip. Keep multiple named lists of places you have discovered — a "Norway road trip" wishlist, "Best coffee in Lisbon", "Someday" — each with a want-to-go / visited status, and share a list with other users.
+Collections is a personal, server-wide library of saved places that lives outside of any single trip. Keep multiple named lists of places you have discovered — a "Norway road trip" wishlist, "Best coffee in Lisbon", "Someday" — each place carrying an idea / want-to-go / visited status, and share a list with other users.
 
 > **Admin:** enable Collections in [Admin-Addons](Admin-Addons).
 
@@ -14,7 +14,7 @@ A place you save to a trip only exists inside that trip. Collections is the oppo
 
 When the admin has enabled the addon, a **Collections** entry appears in the main navigation (and a bottom-tab on mobile). Opening it shows your lists on the left, the active list's places in the middle, and a map on the right.
 
-The dashboard also gains a **Collections widget** that surfaces your lists as compact badges. Each user can hide that widget from their own dashboard under [Display Settings](Display-Settings) without affecting anyone else.
+The dashboard also gains a **Collections widget** that surfaces your lists as compact badges. Each user can hide that widget from their own dashboard under **Dashboard widgets** on the Appearance tab (see [Appearance-Settings](Appearance-Settings)) without affecting anyone else.
 
 ## Lists
 
@@ -34,6 +34,15 @@ Every saved place carries a status you can cycle with one tap:
 
 Status is a Collections concept and is not carried into a trip when you copy a place.
 
+### Setting it from a trip
+
+You usually find out you have been somewhere while looking at the trip, not while browsing the library, so the status can be set from there too:
+
+- The **Save to list** dialog on a trip place shows every list that already holds it, each with its own status pill. Tap a pill to cycle that list's status, or use **Visited everywhere** to mark all of them at once.
+- The places panel has a **mark visited** action in its selection bar (and in the bulk toolbar on phones). Select the places — *Select all* covers the whole trip — and every saved copy of them is marked visited.
+
+Matching is by the place's provider id, its coordinates, or the link a place saved out of that trip already carries, so a copy you renamed inside a list is still found. Lists shared with you read-only are left alone.
+
 ## Categories
 
 Places can be assigned a **category** from the same admin-defined set used across TREK (see [Admin: Categories](Admin-Categories)). Category colours and icons show on the place avatar, the place detail and the list rows, and you can filter a list by category.
@@ -43,10 +52,13 @@ Places can be assigned a **category** from the same admin-defined set used acros
 - **Search and add** — the "+" action opens a search; pick a result and set the name, category, status, a markdown description and links before saving, all in one step.
 - **Save from a trip** — the place inspector and the trip place context menu both offer **Save to collection**, which toggles that place in or out of each of your lists.
 - **Bulk-add from a trip** — in the trip place list, enter select mode, tick several places, and use the **Save to collection** action in the selection bar to copy them all into a chosen list at once. Duplicates (by name or coordinates) are skipped automatically.
+- **Import a whole trip** — the download button in the list's filter row (and the second button on an empty list) opens **Import from a trip**: pick one of your trips, then tick the places you want. Places you already saved are greyed out and cannot be picked twice, and the ones no day of that trip holds start out selected, since those are the plans a trip left behind. **Only new** hides everything already on the list, and the counter on the import button always shows what is about to be added.
 
 ## Place detail
 
 Clicking a saved place opens a detail sheet showing a cover photo (fetched automatically when the place has none of its own), its category, its [labels](#custom-labels), a live status control, a markdown description, and links. Editing the place also lets you assign its labels. From there you can edit the place, **copy it into a trip**, or remove it from the list.
+
+To set your own cover instead of the auto-fetched one, use the camera button on the detail sheet's cover to upload an image (JPG, PNG, GIF or WebP, up to 20 MB); the remove button next to it clears the custom image and restores the automatic default.
 
 ## Filtering and bulk actions
 
@@ -78,7 +90,7 @@ When sharing, the owner assigns each member a permission role, and can change it
 
 | Role | Can do |
 |---|---|
-| **Viewer** | View the list and copy its places into their own trips, and filter by label — no changes to the list. |
+| **Viewer** | View the list, cast their own star rating on its places, copy its places into their own trips, and filter by label — no other changes to the list. |
 | **Editor** *(default)* | Add new places and edit existing ones, and manage + assign the list's labels. |
 | **Admin** | Everything an editor can, plus delete places. |
 

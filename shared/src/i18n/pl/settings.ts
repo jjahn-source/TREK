@@ -23,7 +23,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Szablon mapy',
   'settings.mapTemplatePlaceholder.select': 'Wybierz szablon...',
   'settings.mapDefaultHint': 'Pozostaw puste dla OpenStreetMap (domyślnie)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'Szablon URL dla kafelków mapy',
   'settings.mapProvider': 'Dostawca mapy',
   'settings.mapProviderHint': 'Dotyczy map Trip Planner i Journey. Atlas zawsze używa Leaflet.',
@@ -34,6 +33,11 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Token dostępu Mapbox',
   'settings.mapMapboxTokenHint': 'Token publiczny (pk.*) z',
   'settings.mapMapboxTokenLink': 'mapbox.com → Tokeny dostępu',
+  'settings.mapCartoKey': 'Klucz API CARTO',
+  'settings.mapCartoKeyHint': 'Mapy podkładowe CARTO bez klucza pokazują znak wodny. Bezpłatny, bez konta, z',
+  'settings.mapCartoKeyLink': 'klucz API map podkładowych carto.com',
+  'settings.mapCartoKeyMissing':
+    'Ten szablon to mapa podkładowa CARTO. Bez klucza CARTO nanosi "API KEY REQUIRED" na każdy kafelek. Dopóki nie podasz klucza, TREK pokazuje domyślną mapę podkładową.',
   'settings.mapStyle': 'Styl mapy',
   'settings.mapStylePlaceholder': 'Wybierz styl Mapbox',
   'settings.mapStyleHint': 'Preset lub własny URL mapbox://styles/USER/ID',
@@ -78,6 +82,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Przypomnienia o podróżach',
   'settings.notifyTodoDue': 'Zadanie z terminem',
   'settings.notifyVacayInvite': 'Zaproszenia do połączenia kalendarzy',
+  'settings.notifyVacayShare': 'Udostępnienia kalendarza Vacay',
   'settings.notifyPhotosShared': 'Udostępnione zdjęcia (Immich)',
   'settings.notifyCollabMessage': 'Wiadomości czatu (Collab)',
   'settings.notifyPackingTagged': 'Lista pakowania: przypisania',
@@ -178,6 +183,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Zaproponuj funkcję',
   'settings.about.featureRequestHint': 'Zaproponuj nową funkcję',
   'settings.about.wikiHint': 'Dokumentacja i poradniki',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Miesięczni Patroni',
   'settings.about.supporters.title': 'Towarzystwo podróży dla TREK',
   'settings.about.supporters.subtitle':
@@ -228,6 +237,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Zdjęcie profilowe zostało zaktualizowane',
   'settings.avatarRemoved': 'Zdjęcie profilowe zostało usunięte',
   'settings.avatarError': 'Przesyłanie nie powiodło się',
+  'settings.avatarRemoveError': 'Usuwanie nie powiodło się',
   'settings.mfa.title': 'Uwierzytelnianie dwuskładnikowe (2FA)',
   'settings.mfa.description':
     'Dodaje drugi krok, kiedy logujesz się e-mailem i hasłem. Użyj aplikacji uwierzytelniającej (Google Authenticator, Authy, itp.).',
@@ -297,8 +307,9 @@ const settings: TranslationStrings = {
   'settings.notificationsActive': 'Aktywny kanał',
   'settings.notificationsManagedByAdmin': 'Zdarzenia konfigurowane przez administratora.',
   'settings.mustChangePassword': 'Musisz zmienić hasło przed kontynuowaniem.',
-  'settings.currency': 'Currency',
-  'settings.currencyHint': 'All amounts in Costs are converted to and shown in this currency.',
+  'settings.currency': 'Waluta wyświetlania',
+  'settings.currencyHint':
+    'Kwoty w Kosztach są przeliczane na tę walutę wyłącznie na potrzeby wyświetlania — oryginalne kwoty pozostają bez zmian.',
   'settings.currencyTrip': 'Waluta wyjazdu',
   'settings.passkey.title': 'Klucze dostępu',
   'settings.passkey.description':
@@ -348,11 +359,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Połączenie nieudane',
   'settings.aiParsing.title': 'Analiza AI',
   'settings.aiParsing.hint':
-    'Użyj własnego modelu AI, aby wyodrębniać rezerwacje z przesłanych plików. Ma to zastosowanie tylko wtedy, gdy administrator nie skonfigurował modelu dla całej instancji.',
+    'Wybierz model AI, który wyodrębnia rezerwacje z przesłanych plików. Ma to zastosowanie tylko wtedy, gdy administrator nie skonfigurował modelu dla całej instancji.',
   'settings.aiParsing.provider': 'Dostawca',
   'settings.aiParsing.providerLocal': 'Lokalny (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'Lokalny punkt końcowy (Ollama) konfiguruje się raz dla całej instancji w ustawieniach administratora. Tutaj nadal możesz używać własnego klucza OpenAI lub Anthropic.',
   'settings.aiParsing.model': 'Model',
   'settings.aiParsing.baseUrl': 'Bazowy adres URL',
   'settings.aiParsing.baseUrlHint':
@@ -428,8 +441,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Dolny pasek nawigacji',
+  'settings.appearance.mobileNav.hint':
+    'Wybierz, które elementy pojawią się na pasku, a które w menu „Więcej”. Dashboard zawsze pozostaje pierwszy.',
+  'settings.appearance.mobileNav.inBar': 'Na pasku',
+  'settings.appearance.mobileNav.underMore': 'W menu „Więcej”',
+  'settings.appearance.mobileNav.moreEmpty': 'Nic tu jeszcze nie ma — wszystko mieści się na pasku.',
+  'settings.appearance.mobileNav.pinned': 'Przypięte',
+  'settings.appearance.mobileNav.toMore': 'Przenieś do menu „Więcej”',
+  'settings.appearance.mobileNav.toBar': 'Przenieś na pasek',
+  'settings.appearance.dashOrder': 'Kolejność panelu',
+  'settings.appearance.dashOrder.hint':
+    'Zmień kolejność układania listy podróży i widżetów na panelu telefonu. Wyróżniona podróż zawsze pozostaje na górze.',
+  'settings.appearance.dashOrder.trips': 'Podróże',
+  'settings.appearance.dashOrder.hidden': 'Ukryte',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': 'Uruchamianie',
+  'settings.startPage': 'Strona startowa',
+  'settings.startPageDashboard': 'Panel',
+  'settings.startPageActiveTrip': 'Aktywna podróż',
+  'settings.startPageHint':
+    'TREK otwiera się od razu na podróży, która właśnie trwa, albo na najbliższej nadchodzącej. To ta sama podróż, którą wyróżnia panel.',
+  'settings.startTripTab': 'Karta startowa',
+  'settings.startTripTabHint':
+    'Karta, na której otwiera się podróż. Jeśli należy do wyłączonego dodatku, otworzy się widok planu.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': 'Pamięć podręczna offline',
@@ -494,7 +530,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': 'Kiedy',
   'settings.pluginActivity.columns.status': 'Wynik',
   'settings.alwaysShowRoutes': 'Zawsze pokazuj trasy rezerwacji',
-  'settings.alwaysShowRoutesHint': 'Automatycznie pokazuje na mapie trasę każdego lotu, pociągu i innej rezerwacji, bez konieczności włączania jej pojedynczo.',
+  'settings.alwaysShowRoutesHint':
+    'Automatycznie pokazuje na mapie trasę każdego lotu, pociągu i innej rezerwacji, bez konieczności włączania jej pojedynczo.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'Klucze API',
+  'settings.apiKeys.description': 'Klucze do publicznego API, aby inne oprogramowanie mogło odczytywać Twoje podróże. Tylko odczyt: klucz niczego nie zmieni ani nie usunie.',
+  'settings.apiKeys.create': 'Utwórz klucz',
+  'settings.apiKeys.empty': 'Brak kluczy. Utwórz jeden, aby połączyć inne oprogramowanie.',
+  'settings.apiKeys.createdAt': 'utworzono',
+  'settings.apiKeys.usedAt': 'ostatnio użyty',
+  'settings.apiKeys.deleteTitle': 'Usuń klucz',
+  'settings.apiKeys.deleteMessage': 'Wszystko, co korzysta z tego klucza, natychmiast przestanie działać. Tej operacji nie można cofnąć.',
+  'settings.apiKeys.deleted': 'Klucz usunięty',
+  'settings.apiKeys.deleteFailed': 'Nie udało się usunąć klucza',
+  'settings.apiKeys.createFailed': 'Nie udało się utworzyć klucza',
+  'settings.apiKeys.copy': 'Kopiuj',
+  'settings.apiKeys.docsHint': 'Wyślij klucz jako "Authorization: Bearer ..." lub "X-API-Key: ..." do /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'Utwórz klucz API',
+  'settings.apiKeys.modal.name': 'Nazwa',
+  'settings.apiKeys.modal.namePlaceholder': 'np. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Tylko dla Ciebie, abyś później rozpoznał klucz.',
+  'settings.apiKeys.modal.creating': 'Tworzenie...',
+  'settings.apiKeys.modal.create': 'Utwórz',
+  'settings.apiKeys.modal.createdTitle': 'Klucz API utworzony',
+  'settings.apiKeys.modal.createdWarning': 'Skopiuj klucz teraz. Jest pokazywany tylko raz i później nie można go odzyskać.',
+  'settings.apiKeys.modal.done': 'Gotowe',
 };
 
 export default settings;

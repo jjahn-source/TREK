@@ -4,7 +4,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { pluginsEnabled } from './kill-switch';
 import { PluginsService } from './plugins.service';
 import { PluginRuntimeService } from './plugin-runtime.service';
-import { db } from '../../db/database';
+import { DatabaseService } from '../database/database.service';
+import { PluginUserSettingsUpdateDto } from './plugins.dto';
 
 /**
  * GET/POST /api/plugin-settings/:id — a USER's own `scope:'user'` settings for a
@@ -23,10 +24,11 @@ export class PluginUserSettingsController {
   constructor(
     private readonly plugins: PluginsService,
     private readonly runtime: PluginRuntimeService,
+    private readonly dbs: DatabaseService,
   ) {}
 
   private activeWithUserFields(id: string): boolean {
-    const row = db.prepare("SELECT 1 FROM plugins WHERE id = ? AND status = 'active'").get(id);
+    const row = this.dbs.connection.prepare("SELECT 1 FROM plugins WHERE id = ? AND status = 'active'").get(id);
     return !!row;
   }
 
@@ -73,12 +75,12 @@ export class PluginUserSettingsController {
   @Post(':id')
   update(
     @Param('id') id: string,
-    @Body() body: { config?: Record<string, unknown> },
+    @Body() body: PluginUserSettingsUpdateDto,
     @Req() req: Request & { user?: { id: number } },
   ): { config: Record<string, unknown> } {
     const userId = req.user?.id;
     if (!pluginsEnabled() || userId == null || !this.activeWithUserFields(id)) return { config: {} };
-    const patch = body?.config && typeof body.config === 'object' ? body.config : {};
+    const patch = body?.config && typeof body.config === 'object' ? (body.config as Record<string, unknown>) : {};
     return { config: this.plugins.updateUserConfig(id, userId, patch) };
   }
 }

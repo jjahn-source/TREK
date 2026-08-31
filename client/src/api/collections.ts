@@ -9,6 +9,7 @@ import type {
   CollectionUpdateRequest,
   CollectionSavePlaceRequest,
   CollectionSaveFromTripRequest,
+  CollectionImportablesResponse,
   CollectionPlaceUpdateRequest,
   CollectionCopyToTripRequest,
   CollectionInviteRequest,
@@ -16,6 +17,7 @@ import type {
   CollectionInviteActionRequest,
   CollectionInviteCancelRequest,
   CollectionStatus,
+  CollectionSetStatusManyResponse,
   Collection,
   CollectionPlace,
   CollectionLabel,
@@ -68,10 +70,22 @@ export const collectionsApi = {
     ax.post(`${base}/places/from-trip`, body satisfies CollectionSaveFromTripRequest).then((r: AxiosResponse) => r.data),
   saveFromTripMany: (collectionId: number, tripId: number, placeIds: number[], force?: boolean): Promise<{ copied: number; skipped: { id: number; name: string }[] }> =>
     ax.post(`${base}/places/from-trip-many`, { collection_id: collectionId, source_trip_id: tripId, source_place_ids: placeIds, force }).then((r: AxiosResponse) => r.data),
+  importable: (collectionId: number, tripId: number): Promise<CollectionImportablesResponse> =>
+    ax.get(`${base}/${collectionId}/importable/${tripId}`).then((r: AxiosResponse) => r.data),
   updatePlace: (pid: number, body: CollectionPlaceUpdateRequest): Promise<CollectionPlace> =>
     ax.patch(`${base}/places/${pid}`, body satisfies CollectionPlaceUpdateRequest).then((r: AxiosResponse) => r.data),
+  uploadPlaceImage: (pid: number, formData: FormData): Promise<CollectionPlace> =>
+    postMultipart(`${base}/places/${pid}/image`, formData),
   setStatus: (pid: number, status: CollectionStatus): Promise<CollectionPlace> =>
     ax.post(`${base}/places/${pid}/status`, { status }).then((r: AxiosResponse) => r.data),
+  setStatusMany: (ids: number[], status: CollectionStatus): Promise<CollectionSetStatusManyResponse> =>
+    ax.post(`${base}/places/status-many`, { ids, status }).then((r: AxiosResponse) => r.data),
+  setStatusFromTrip: (tripId: number, placeIds: number[], status: CollectionStatus): Promise<CollectionSetStatusManyResponse> =>
+    ax.post(`${base}/places/status-from-trip`, { trip_id: tripId, place_ids: placeIds, status }).then((r: AxiosResponse) => r.data),
+  ratePlace: (pid: number, rating: number | null): Promise<CollectionPlace> =>
+    rating === null
+      ? ax.delete(`${base}/places/${pid}/rating`).then((r: AxiosResponse) => r.data)
+      : ax.put(`${base}/places/${pid}/rating`, { rating }).then((r: AxiosResponse) => r.data),
   deletePlace: (pid: number): Promise<unknown> =>
     ax.delete(`${base}/places/${pid}`).then((r: AxiosResponse) => r.data),
   deleteMany: (ids: number[]): Promise<unknown> =>

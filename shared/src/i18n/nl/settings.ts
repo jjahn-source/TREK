@@ -24,7 +24,6 @@ const settings: TranslationStrings = {
   'settings.mapTemplate': 'Kaartsjabloon',
   'settings.mapTemplatePlaceholder.select': 'Selecteer sjabloon...',
   'settings.mapDefaultHint': 'Laat leeg voor OpenStreetMap (standaard)',
-  'settings.mapTemplatePlaceholder': 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   'settings.mapHint': 'URL-sjabloon voor kaarttegels',
   'settings.mapProvider': 'Kaartprovider',
   'settings.mapProviderHint': 'Geldt voor Trip Planner en Journey kaarten. Atlas gebruikt altijd Leaflet.',
@@ -35,6 +34,11 @@ const settings: TranslationStrings = {
   'settings.mapMapboxToken': 'Mapbox Access Token',
   'settings.mapMapboxTokenHint': 'Openbaar token (pk.*) van',
   'settings.mapMapboxTokenLink': 'mapbox.com → Access tokens',
+  'settings.mapCartoKey': 'CARTO API-sleutel',
+  'settings.mapCartoKeyHint': 'CARTO-basiskaarten tonen zonder sleutel een watermerk. Gratis en zonder account, via',
+  'settings.mapCartoKeyLink': 'carto.com basemap API-sleutel',
+  'settings.mapCartoKeyMissing':
+    'Deze sjabloon is een CARTO-basiskaart. Zonder sleutel drukt CARTO "API KEY REQUIRED" op elke tegel. Zolang er geen sleutel is, toont TREK de standaardbasiskaart.',
   'settings.mapStyle': 'Kaartstijl',
   'settings.mapStylePlaceholder': 'Kies een Mapbox-stijl',
   'settings.mapStyleHint': 'Preset of eigen mapbox://styles/USER/ID URL',
@@ -79,6 +83,7 @@ const settings: TranslationStrings = {
   'settings.notifyTripReminder': 'Reisherinneringen',
   'settings.notifyTodoDue': 'Taak verloopt',
   'settings.notifyVacayInvite': 'Vacay-fusieuitnodigingen',
+  'settings.notifyVacayShare': 'Gedeelde Vacay-kalenders',
   'settings.notifyPhotosShared': "Gedeelde foto's (Immich)",
   'settings.notifyCollabMessage': 'Chatberichten (Collab)',
   'settings.notifyPackingTagged': 'Inpaklijst: toewijzingen',
@@ -182,6 +187,10 @@ const settings: TranslationStrings = {
   'settings.about.featureRequest': 'Feature aanvragen',
   'settings.about.featureRequestHint': 'Stel een nieuwe functie voor',
   'settings.about.wikiHint': 'Documentatie en handleidingen',
+  'settings.about.descriptionManaged':
+    'TREK helps you organize your trips from the first idea to the last memory. Day planning, budget, packing lists, photos and much more — all in one place.',
+  'settings.about.sourceTitle': 'Source code',
+  'settings.about.sourceHint': 'TREK is open source, licensed AGPL-3.0',
   'settings.about.supporters.badge': 'Maandelijkse Steuners',
   'settings.about.supporters.title': 'Reisgezelschap voor TREK',
   'settings.about.supporters.subtitle':
@@ -261,6 +270,7 @@ const settings: TranslationStrings = {
   'settings.avatarUploaded': 'Profielfoto bijgewerkt',
   'settings.avatarRemoved': 'Profielfoto verwijderd',
   'settings.avatarError': 'Uploaden mislukt',
+  'settings.avatarRemoveError': 'Verwijderen mislukt',
   'settings.bookingLabels': 'Routelabels voor boekingen',
   'settings.bookingLabelsHint': 'Toon station- / luchthavennamen op de kaart. Indien uit, alleen het icoon.',
   'settings.notifyVersionAvailable': 'Nieuwe versie beschikbaar',
@@ -300,8 +310,9 @@ const settings: TranslationStrings = {
   'settings.notificationPreferences.webhook': 'Webhook',
   'settings.notificationPreferences.email': 'Email',
   'settings.notificationPreferences.ntfy': 'Ntfy',
-  'settings.currency': 'Valuta',
-  'settings.currencyHint': 'Alle bedragen onder Onkosten worden omgerekend naar en weergegeven in deze valuta.',
+  'settings.currency': 'Weergavevaluta',
+  'settings.currencyHint':
+    'Bedragen onder Onkosten worden alleen ter weergave naar deze valuta omgerekend — de oorspronkelijke bedragen blijven ongewijzigd.',
   'settings.currencyTrip': 'Valuta van de reis',
   'settings.passkey.title': 'Passkeys',
   'settings.passkey.description':
@@ -349,11 +360,13 @@ const settings: TranslationStrings = {
   'settings.airtrail.test.failed': 'Verbinding mislukt',
   'settings.aiParsing.title': 'AI-verwerking',
   'settings.aiParsing.hint':
-    'Gebruik je eigen AI-model om boekingen uit geüploade bestanden te halen. Dit geldt alleen als je beheerder geen model voor de hele instantie heeft ingesteld.',
+    'Kies het AI-model waarmee boekingen uit geüploade bestanden worden gehaald. Dit geldt alleen als je beheerder geen model voor de hele instantie heeft ingesteld.',
   'settings.aiParsing.provider': 'Provider',
   'settings.aiParsing.providerLocal': 'Lokaal (Ollama)',
   'settings.aiParsing.providerOpenai': 'OpenAI',
   'settings.aiParsing.providerAnthropic': 'Anthropic',
+  'settings.aiParsing.localAdminOnly':
+    'Een lokaal endpoint (Ollama) wordt eenmalig voor de hele instantie ingesteld in de beheerinstellingen. Je kunt hier nog steeds je eigen OpenAI- of Anthropic-sleutel gebruiken.',
   'settings.aiParsing.model': 'Model',
   'settings.aiParsing.baseUrl': 'Basis-URL',
   'settings.aiParsing.baseUrlHint':
@@ -429,8 +442,31 @@ const settings: TranslationStrings = {
   'settings.appearance.example.normal': 'Place names, descriptions',
   'settings.appearance.example.small': 'Addresses, labels',
   'settings.appearance.experimental': 'Experimental',
+  'settings.appearance.mobileNav': 'Onderste navigatiebalk',
+  'settings.appearance.mobileNav.hint':
+    'Kies welke items in de balk verschijnen en welke onder “Meer” staan. Dashboard staat altijd vooraan.',
+  'settings.appearance.mobileNav.inBar': 'In de balk',
+  'settings.appearance.mobileNav.underMore': 'Onder “Meer”',
+  'settings.appearance.mobileNav.moreEmpty': 'Nog niets hier — alles past in de balk.',
+  'settings.appearance.mobileNav.pinned': 'Vastgezet',
+  'settings.appearance.mobileNav.toMore': 'Naar “Meer” verplaatsen',
+  'settings.appearance.mobileNav.toBar': 'Naar de balk verplaatsen',
+  'settings.appearance.dashOrder': 'Dashboardvolgorde',
+  'settings.appearance.dashOrder.hint':
+    'Wijzig de volgorde waarin de reislijst en widgets op je mobiele dashboard worden gestapeld. De uitgelichte reis blijft altijd bovenaan.',
+  'settings.appearance.dashOrder.trips': 'Reizen',
+  'settings.appearance.dashOrder.hidden': 'Verborgen',
   'settings.general.languageRegion': 'Language & region',
   'settings.general.travelMap': 'Travel & map',
+  'settings.general.startup': 'Opstarten',
+  'settings.startPage': 'Startpagina',
+  'settings.startPageDashboard': 'Dashboard',
+  'settings.startPageActiveTrip': 'Actieve reis',
+  'settings.startPageHint':
+    'TREK opent direct de reis die nu loopt, of anders de eerstvolgende. Dat is dezelfde reis die het dashboard uitlicht.',
+  'settings.startTripTab': 'Starttabblad',
+  'settings.startTripTabHint':
+    'Het tabblad waarmee de reis opent. Hoort het bij een uitgeschakelde add-on, dan opent het plan in plaats daarvan.',
 
   // ── Offline (#1135)
   'settings.offline.cache.title': 'Offline cache',
@@ -495,7 +531,32 @@ const settings: TranslationStrings = {
   'settings.pluginActivity.columns.when': 'Wanneer',
   'settings.pluginActivity.columns.status': 'Resultaat',
   'settings.alwaysShowRoutes': 'Boekingsroutes altijd tonen',
-  'settings.alwaysShowRoutesHint': 'Toont automatisch de route van elke vlucht, trein en andere boeking op de kaart, zonder dat u dit per boeking hoeft in te schakelen.',
+  'settings.alwaysShowRoutesHint':
+    'Toont automatisch de route van elke vlucht, trein en andere boeking op de kaart, zonder dat u dit per boeking hoeft in te schakelen.',
+
+  // Public API keys (Settings -> Integrations)
+  'settings.apiKeys.title': 'API-sleutels',
+  'settings.apiKeys.description': 'Sleutels voor de publieke API, zodat andere software je reizen kan lezen. Alleen-lezen: een sleutel kan niets wijzigen of verwijderen.',
+  'settings.apiKeys.create': 'Sleutel aanmaken',
+  'settings.apiKeys.empty': 'Nog geen sleutels. Maak er een om andere software te koppelen.',
+  'settings.apiKeys.createdAt': 'aangemaakt',
+  'settings.apiKeys.usedAt': 'laatst gebruikt',
+  'settings.apiKeys.deleteTitle': 'Sleutel verwijderen',
+  'settings.apiKeys.deleteMessage': 'Alles wat deze sleutel gebruikt, stopt direct met werken. Dit kan niet ongedaan worden gemaakt.',
+  'settings.apiKeys.deleted': 'Sleutel verwijderd',
+  'settings.apiKeys.deleteFailed': 'Sleutel kon niet worden verwijderd',
+  'settings.apiKeys.createFailed': 'Sleutel kon niet worden aangemaakt',
+  'settings.apiKeys.copy': 'Kopiëren',
+  'settings.apiKeys.docsHint': 'Stuur de sleutel als "Authorization: Bearer ..." of "X-API-Key: ..." naar /api/v1.',
+  'settings.apiKeys.modal.createTitle': 'API-sleutel aanmaken',
+  'settings.apiKeys.modal.name': 'Naam',
+  'settings.apiKeys.modal.namePlaceholder': 'bijv. Dawarich',
+  'settings.apiKeys.modal.nameHint': 'Alleen voor jou, zodat je de sleutel later herkent.',
+  'settings.apiKeys.modal.creating': 'Aanmaken...',
+  'settings.apiKeys.modal.create': 'Aanmaken',
+  'settings.apiKeys.modal.createdTitle': 'API-sleutel aangemaakt',
+  'settings.apiKeys.modal.createdWarning': 'Kopieer de sleutel nu. Hij wordt één keer getoond en kan later niet worden opgehaald.',
+  'settings.apiKeys.modal.done': 'Klaar',
 };
 
 export default settings;

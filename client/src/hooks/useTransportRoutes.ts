@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Reservation, ReservationEndpoint } from '../types'
 import { calculateRouteWithLegs } from '../components/Map/RouteCalculator'
+import { haversineKm, MAX_DRIVE_KM } from '../utils/geo'
 
 /**
  * Real road-network geometry for road-based transport bookings (car, bus, taxi,
@@ -23,17 +24,9 @@ const ROAD_PROFILE: Record<string, 'driving' | 'cycling'> = {
 // Beyond this straight-line distance a car/taxi/bike (or even coach) booking is
 // almost always a data quirk or an inter-continental hop the road router can't
 // resolve — keep the straight line and don't hammer the public OSRM demo.
-const MAX_ROUTE_KM = 2000
-
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6371
-  const dLat = (b.lat - a.lat) * Math.PI / 180
-  const dLng = (b.lng - a.lng) * Math.PI / 180
-  const la1 = a.lat * Math.PI / 180
-  const la2 = b.lat * Math.PI / 180
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(h))
-}
+// Shared with the day-route builder, which draws the same conclusion about a
+// booking endpoint that landed next to a local stop (#2133).
+const MAX_ROUTE_KM = MAX_DRIVE_KM
 
 function orderedWaypoints(r: Reservation): ReservationEndpoint[] {
   return (r.endpoints || [])

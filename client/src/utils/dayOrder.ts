@@ -1,6 +1,16 @@
 import type { Day, Accommodation, RouteAnchors } from '../types'
 import { parseTimeToMinutes } from './dayMerge'
 
+/**
+ * Set on an edge waypoint that is the endpoint of a booking which CARRIES you out of
+ * the day's geography (see `isCarrierTransport`): 'departure' = you left from this
+ * point, 'arrival' = you were set down at it. A hire car — a vehicle you keep driving —
+ * leaves this unset, so its pickup/drop-off points keep the hotel legs they have always
+ * drawn. Undefined always means "no opinion", which is what keeps every existing caller
+ * and the activity-free transfer day behaving exactly as before.
+ */
+export type CarrierEdge = 'departure' | 'arrival' | null
+
 export const getDayOrder = (day: Day, days: Day[]): number =>
   day.day_number ?? days.indexOf(day)
 
@@ -67,14 +77,24 @@ export const getAccommodationAnchors = (
 export const shouldDrawMorningLeg = (
   bookends: { morning?: Accommodation; morningIsSleptHere?: boolean },
   day: Day,
-  firstStop?: { isPlace: boolean; time?: string | null },
+  firstStop?: { isPlace: boolean; time?: string | null; carrierEdge?: CarrierEdge },
 ): boolean => {
+  // You landed here. Whatever hotel the day belongs to, nobody drove out of it to the
+  // airport they arrived at — so there is no morning leg, not even on a night you
+  // provably slept in that hotel (#2133).
+  if (firstStop?.carrierEdge === 'arrival') return false
   if (bookends.morningIsSleptHere) return true
   const m = bookends.morning
   if (!m || m.start_day_id !== day.id || !firstStop?.isPlace) return false
   const checkIn = parseTimeToMinutes(m.check_in)
+  // No check-in time on the stay means there is no bar to clear, and "no
+  // information" was being read as "proof against" — which silently opened the
+  // loop at the start of every arrival day, since the hotel picker leaves the
+  // time blank by default (#2009). With a time set, #1465 still holds: an
+  // earlier stop is a place you reached before the hotel and draws no leg.
+  if (checkIn == null) return true
   const stop = parseTimeToMinutes(firstStop.time)
-  return checkIn != null && stop != null && stop >= checkIn
+  return stop != null && stop >= checkIn
 }
 
 // Mirror of shouldDrawMorningLeg for the last-stop → hotel evening leg. It is a real drive when
@@ -85,14 +105,20 @@ export const shouldDrawMorningLeg = (
 export const shouldDrawEveningLeg = (
   bookends: { evening?: Accommodation; eveningIsOvernight?: boolean },
   day: Day,
-  lastStop?: { isPlace: boolean; time?: string | null },
+  lastStop?: { isPlace: boolean; time?: string | null; carrierEdge?: CarrierEdge },
 ): boolean => {
+  // Mirror: you took off from here, so no drive leads from it back to tonight's hotel —
+  // the reported "flight starting airport connected to the accommodation" (#2133).
+  if (lastStop?.carrierEdge === 'departure') return false
   if (bookends.eveningIsOvernight) return true
   const e = bookends.evening
   if (!e || e.end_day_id !== day.id || !lastStop?.isPlace) return false
   const checkOut = parseTimeToMinutes(e.check_out)
+  // Mirror of the morning rule: with no check-out time recorded there is nothing
+  // to have missed, so the return leg is drawn and the loop closes (#2009).
+  if (checkOut == null) return true
   const stop = parseTimeToMinutes(lastStop.time)
-  return checkOut != null && stop != null && stop <= checkOut
+  return stop != null && stop <= checkOut
 }
 
 export const isDayInAccommodationRange = (

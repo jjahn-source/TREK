@@ -78,6 +78,9 @@
 - [[Plugin Permissions|Plugin-Permissions]]
 - [[Publishing a Plugin|Plugin-Publishing]]
 
+## Integrations
+- [[Public API|Public-API]]
+
 ## AI / MCP
 - [[MCP Overview|MCP-Overview]]
 - [[MCP Setup|MCP-Setup]]
@@ -94,6 +97,7 @@
 - [[Admin: Packing Templates|Admin-Packing-Templates]]
 - [[Admin: Permissions|Admin-Permissions]]
 - [[Admin: Plugins|Admin-Plugins]]
+- [[Admin: Storage|Admin-Storage]]
 - [[Admin: MCP Tokens|Admin-MCP-Tokens]]
 - [[Admin: GitHub Releases|Admin-GitHub-Releases]]
 

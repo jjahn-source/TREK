@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Excluir despesa?',
+  'costs.confirm.deleteBody': '"{name}" será excluído permanentemente.',
   'budget.title': 'Orçamento',
   'budget.exportCsv': 'Exportar CSV',
   'budget.emptyTitle': 'Nenhum orçamento criado ainda',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Desfazer',
   'costs.whatFor': 'Para que foi?',
   'costs.namePlaceholder': 'ex.: jantar, lembranças, gasolina…',
+  'costs.note': 'Nota',
+  'costs.notePlaceholder': 'O que incluía, quem deve o quê…',
+  'costs.addNote': 'Adicionar nota',
+  'costs.showNote': 'Mostrar nota',
+  'costs.hideNote': 'Ocultar nota',
   'costs.totalAmount': 'Valor total',
   'costs.currency': 'Moeda',
   'costs.day': 'Dia',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Taxas e ingressos',
   'costs.cat.health': 'Saúde',
   'costs.cat.tips': 'Gorjetas',
+  'costs.cat.fuel': 'Combustível',
+  'costs.cat.parking': 'Estacionamento',
   'costs.cat.other': 'Outros',
   'costs.daysCount': '{count} dias',
   'costs.travelers': '{count} viajantes',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Todas as categorias',
   'costs.filter.allDays': 'Todos os dias',
   'costs.expensesCount': '{count} despesas',
+  'costs.ticketItemName': 'Nome do item',
+  'costs.ticketSplitting': 'Dividindo entre:',
+  'costs.ticketAddItem': 'Adicionar item',
+  'costs.ticketShares': 'Parte de cada um',
+  'costs.excluded': 'Fora',
+  'costs.splitBalanced': 'A divisão bate com o total',
+  'costs.splitSumUnder': 'Soma das partes: {sum} de {total} (faltam {diff})',
+  'costs.splitSumOver': 'Soma das partes: {sum} de {total} (sobram {diff})',
 };
 export default budget;

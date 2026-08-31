@@ -31,6 +31,28 @@ function distanceTo(p: CollectionPlace, center: { lat: number; lng: number }): n
 
 interface Opt { key: string | number; label: string; icon?: React.ReactNode; count?: number }
 
+/** Detail requests fired at once while building the union — keeps a user with
+ *  many lists from opening the modal with a burst of parallel requests. */
+const DETAIL_BATCH = 4
+
+/** Union of every list's places, in list order, without duplicates. */
+async function loadSavedPlaces(ids: number[]): Promise<CollectionPlace[]> {
+  const merged: CollectionPlace[] = []
+  const seen = new Set<number>()
+  for (let i = 0; i < ids.length; i += DETAIL_BATCH) {
+    const batch = await Promise.all(ids.slice(i, i + DETAIL_BATCH).map(id => collectionsApi.get(id).catch(() => null)))
+    for (const d of batch) {
+      if (!d) continue
+      for (const p of d.places) {
+        if (seen.has(p.id)) continue
+        seen.add(p.id)
+        merged.push(p)
+      }
+    }
+  }
+  return merged
+}
+
 /** Compact click-away dropdown (Tailwind — this panel lives outside .trek-dash). */
 function FilterDropdown({ current, options, onSelect, lead }: {
   current: string | number
@@ -93,13 +115,8 @@ export default function CollectionPicker({ bias, onSelect, t }: CollectionPicker
     setLoading(true)
     collectionsApi.list()
       .then(async (res) => {
-        const detail = await Promise.all(res.collections.map(c => collectionsApi.get(c.id).catch(() => null)))
+        const merged = await loadSavedPlaces(res.collections.map(c => c.id))
         if (cancelled) return
-        const merged: CollectionPlace[] = []
-        for (const d of detail) {
-          if (!d) continue
-          for (const p of d.places) merged.push(p)
-        }
         setLists(res.collections.map(c => ({ id: c.id, name: c.name, color: c.color ?? null })))
         setPlaces(merged)
       })
@@ -113,6 +130,11 @@ export default function CollectionPicker({ bias, onSelect, t }: CollectionPicker
     [bias],
   )
 
+  // The list is every saved place across every collection, which grows without
+  // bound. Show a first page and let the rest be asked for.
+  const PAGE = 10
+  const [shown, setShown] = useState(PAGE)
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     const list = places.filter(p => {
@@ -125,6 +147,13 @@ export default function CollectionPicker({ bias, onSelect, t }: CollectionPicker
     else list.sort((a, b) => a.name.localeCompare(b.name))
     return list
   }, [places, search, center, listFilter, statusFilter])
+
+  // Searching or filtering starts a new list; keeping the old offset would drop
+  // the user somewhere in the middle of it.
+  useEffect(() => { setShown(PAGE) }, [search, listFilter, statusFilter])
+
+  const page = visible.slice(0, shown)
+  const remaining = visible.length - page.length
 
   const listOpts: Opt[] = [
     { key: 'all', label: t('collections.picker.allLists'), icon: <Layers size={13} />, count: places.length },
@@ -175,7 +204,7 @@ export default function CollectionPicker({ bias, onSelect, t }: CollectionPicker
           <p className="text-center text-[12px] text-content-faint py-10 px-3">{t('collections.picker.empty')}</p>
         ) : (
           <div className="flex flex-col gap-1">
-            {visible.map(place => (
+            {page.map(place => (
               <button
                 key={place.id}
                 type="button"
@@ -190,6 +219,17 @@ export default function CollectionPicker({ bias, onSelect, t }: CollectionPicker
                 </span>
               </button>
             ))}
+            {remaining > 0 && (
+              <div className="pt-1 mt-1 border-t border-edge">
+                <button
+                  type="button"
+                  onClick={() => setShown(n => n + PAGE)}
+                  className="w-full px-2 py-1.5 rounded-lg text-[12px] font-medium text-content-secondary hover:bg-surface-hover transition-colors"
+                >
+                  {t('collections.picker.showMore', { count: remaining })}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

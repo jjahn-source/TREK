@@ -124,6 +124,9 @@ const admin: TranslationStrings = {
   'admin.placesDetails.title': 'Ortsdetails',
   'admin.placesDetails.subtitle':
     'Detaillierte Ortsinformationen (Öffnungszeiten, Bewertung, Website) von der Google Places API laden. Deaktivieren, um API-Kontingent zu sparen.',
+  'admin.placesEnrich.title': 'Ortsanreicherung',
+  'admin.placesEnrich.subtitle':
+    'Bilder und eine Beschreibung beim Hinzufügen eines Ortes anzeigen. Wikipedia und OpenStreetMap werden immer genutzt; Google kommt zusätzlich dazu, wenn Ortsfotos oder Ortsdetails aktiv sind.',
   'admin.bagTracking.title': 'Gepäck-Tracking',
   'admin.bagTracking.subtitle': 'Gewicht und Gepäckstück-Zuordnung für Packlisteneinträge aktivieren',
   'admin.collab.chat.title': 'Chat',
@@ -159,9 +162,12 @@ const admin: TranslationStrings = {
   'admin.packingTemplates.loadError': 'Vorlagen konnten nicht geladen werden',
   'admin.packingTemplates.createError': 'Vorlage konnte nicht erstellt werden',
   'admin.packingTemplates.deleteError': 'Vorlage konnte nicht gelöscht werden',
+  'admin.packingTemplates.deleteCategoryError': 'Kategorie konnte nicht gelöscht werden',
+  'admin.packingTemplates.deleteItemError': 'Eintrag konnte nicht gelöscht werden',
   'admin.packingTemplates.saveError': 'Fehler beim Speichern',
   'admin.tabs.addons': 'Addons',
   'admin.tabs.plugins': 'Plugins',
+  'admin.tabs.storage': 'Speicher',
   'admin.plugins.rescan': 'Neu scannen',
   'admin.plugins.rescanned': 'Plugin-Ordner neu gescannt',
   'admin.plugins.upload': 'Plugin hochladen',
@@ -216,6 +222,7 @@ const admin: TranslationStrings = {
   'admin.plugins.updateTo': 'Update → v{version}',
   'admin.plugins.enabledToggle': 'Plugin aktivieren',
   'plugins.notFound': 'Plugin nicht gefunden',
+  'plugins.frameLoadFailed': 'Dieses Plugin konnte nicht geladen werden.',
   'admin.plugins.title': 'Plugins',
   'admin.plugins.subtitle': 'Plugins von Drittanbietern auf deiner Instanz installieren und verwalten.',
   'admin.plugins.disabledTitle': 'Plugins sind deaktiviert',
@@ -264,7 +271,7 @@ const admin: TranslationStrings = {
   'admin.plugins.perm.db:write:vacay':
     'Urlaubstage und Betriebsferien im aktiven Plan des handelnden Nutzers umschalten (benötigt das Vacay-Addon)',
   'admin.plugins.perm.db:write:journal':
-    'Tagebucheinträge in Reisetagebüchern anlegen, bearbeiten und löschen, die der handelnde Nutzer bearbeiten kann (benötigt das Journey-Addon)',
+    'Tagebucheinträge in Reisetagebüchern anlegen, bearbeiten, löschen und mit Fotos versehen, die der handelnde Nutzer bearbeiten kann (benötigt das Journey-Addon)',
   'admin.plugins.perm.db:write:collections':
     'Sammlungen anlegen und bearbeiten und Orte darin speichern, mit der Sammlungsrolle des handelnden Nutzers (benötigt das Collections-Addon)',
   'admin.plugins.perm.db:write:files':
@@ -317,6 +324,19 @@ const admin: TranslationStrings = {
     'Spalten und Aktionen zu Reise-Ansichten hinzufügen (Reservierungen, Orte, Tage)',
   'admin.plugins.perm.hook:map-marker-provider':
     'Marker zur Reisekarte hinzufügen (z. B. Buchungen oder POIs anzeigen)',
+  'admin.plugins.perm.hook:map-layer-provider': 'Routen, Korridore und Zonen auf der Reisekarte zeichnen',
+  'admin.plugins.perm.hook:route-provider':
+    'Routing-Profile anbieten, mit denen der Planer Tage berechnet (z. B. E-Auto-Routing mit Ladestopps)',
+  'admin.plugins.perm.hook:day-schedule-provider': 'Zeiteinträge an den Tagesplan anhängen (Ladestopps, Puffer)',
+  'admin.plugins.perm.hook:day-tint-provider':
+    'Tage im Tagesplan farblich markieren (z. B. zu welchem Reiseabschnitt ein Tag gehört)',
+  'admin.plugins.cap.mcpTools': 'Veröffentlicht KI-Tools',
+  'admin.plugins.mcpToolsTitle': 'Veröffentlichte KI-Tools',
+  'admin.plugins.mcpToolsHint': 'Ein Assistent kann sie im Namen eines Nutzers ausführen. Jedes handelt mit den oben erteilten Rechten.',
+  'admin.plugins.perm.mcp:tools':
+    'Tools veröffentlichen, die ein KI-Assistent in deinem Namen ausführen kann (es handelt mit den Rechten, die du dem Plugin hier erteilst, nicht mit denen des Assistenten)',
+  'admin.plugins.perm.geolocation:read':
+    'Deinen Live-Standort abfragen, solange eine seiner Ansichten offen ist (TREK liest ihn mit der Standortfreigabe dieser Seite, nicht mit einer eigenen des Plugins)',
   'admin.plugins.perm.hook:pdf-section-provider': 'Textabschnitte an den PDF-Export einer Reise anhängen',
   'admin.plugins.perm.hook:atlas-layer-provider':
     'Länder auf der Atlas-Weltkarte hervorheben (z. B. Wunschlisten oder Reisehinweise)',
@@ -409,6 +429,19 @@ const admin: TranslationStrings = {
   'admin.plugins.sortUpdates': 'Updates zuerst',
   'admin.plugins.sortDownloads': 'Meiste Downloads',
   'admin.plugins.updatesAvailable': '{count} Updates für deine Plugins verfügbar.',
+  'admin.plugins.newerNeedsTrek': 'v{version} verfügbar — benötigt TREK {range}',
+  'admin.plugins.versionsTitle': 'Versionen',
+  'admin.plugins.versionPickerTitle': 'Version wechseln — {name}',
+  'admin.plugins.versionSwitch': 'Zu {version} wechseln',
+  'admin.plugins.versionNeedsTrek': 'benötigt TREK {range}',
+  'admin.plugins.changeVersion': 'Version wechseln…',
+  'admin.plugins.noVersions': 'Keine veröffentlichten Versionen in der Registry gefunden.',
+  'admin.plugins.downgradeTitle': 'Dieses Plugin zurücksetzen?',
+  'admin.plugins.downgradeBody': 'Wechsel von v{from} zu v{to}: Von der neueren Version geschriebene Daten bleiben erhalten, und die ältere Version versteht sie möglicherweise nicht.',
+  'admin.plugins.downgradeConfirm': 'Zurücksetzen',
+  'admin.plugins.updatesHeld': 'Updates pausiert bei v{version}',
+  'admin.plugins.resumeUpdates': 'Updates fortsetzen',
+  'admin.plugins.updatesResumed': 'Updates fortgesetzt',
   'admin.plugins.updateAll': 'Alle aktualisieren',
   'admin.plugins.noMatchInstalled': 'Keine installierten Plugins passen zu deiner Suche.',
   'admin.plugins.noMatchRegistry': 'Keine Plugins in der Registry passen zu deiner Suche.',
@@ -437,6 +470,11 @@ const admin: TranslationStrings = {
   'admin.plugins.cap.calendar': 'Liefert Kalender-Events',
   'admin.plugins.cap.placeDetails': 'Reichert Orte an',
   'admin.plugins.cap.warnings': 'Meldet Probleme',
+  'admin.plugins.cap.mapLayers': 'Zeichnet auf der Karte',
+  'admin.plugins.cap.routing': 'Bietet Routing an',
+  'admin.plugins.cap.daySchedule': 'Ergänzt Planzeiten',
+  'admin.plugins.cap.dayTint': 'Färbt Tage ein',
+  'admin.plugins.cap.geolocation': 'Liest deinen Standort',
   'admin.plugins.cap.events': 'Reagiert auf Aktivität',
   'admin.plugins.cap.requiresAddon': 'Benötigt {addon}',
   'admin.plugins.cap.dependsOn': 'Benötigt {id} {version}',
@@ -660,6 +698,9 @@ const admin: TranslationStrings = {
   'admin.defaultSettings.mapboxStylePlaceholder': 'Stil auswählen…',
   'admin.defaultSettings.mapbox3d': '3D-Gebäude & Gelände',
   'admin.defaultSettings.mapboxQuality': 'Hochqualitätsmodus',
+  'admin.defaultSettings.cartoKey': 'Gemeinsamer CARTO-Key',
+  'admin.defaultSettings.cartoKeyHint':
+    'Wird für jeden Nutzer verwendet, der keinen eigenen Key eingetragen hat, damit die ganze Instanz CARTO-Kacheln ohne Wasserzeichen bekommt. Verschlüsselt gespeichert.',
   'admin.group.users': 'Benutzer',
   'admin.group.config': 'Konfiguration',
   'admin.group.integration': 'Integrationen',

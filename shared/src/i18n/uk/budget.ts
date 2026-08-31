@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Видалити витрату?',
+  'costs.confirm.deleteBody': '«{name}» буде видалено безповоротно.',
   'budget.title': 'Бюджет',
   'budget.exportCsv': 'Експорт CSV',
   'budget.emptyTitle': 'Бюджет ще не створено',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Скасувати',
   'costs.whatFor': 'За що це було?',
   'costs.namePlaceholder': 'напр. вечеря, сувеніри, пальне…',
+  'costs.note': 'Нотатка',
+  'costs.notePlaceholder': 'Що входило, хто скільки винен…',
+  'costs.addNote': 'Додати нотатку',
+  'costs.showNote': 'Показати нотатку',
+  'costs.hideNote': 'Сховати нотатку',
   'costs.totalAmount': 'Загальна сума',
   'costs.currency': 'Валюта',
   'costs.day': 'День',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Збори та квитки',
   'costs.cat.health': 'Здоров’я',
   'costs.cat.tips': 'Чайові',
+  'costs.cat.fuel': 'Пальне',
+  'costs.cat.parking': 'Паркування',
   'costs.cat.other': 'Інше',
   'costs.daysCount': '{count} днів',
   'costs.travelers': '{count} мандрівників',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Усі категорії',
   'costs.filter.allDays': 'Усі дні',
   'costs.expensesCount': '{count} витрат',
+  'costs.ticketItemName': 'Назва позиції',
+  'costs.ticketSplitting': 'Ділиться між:',
+  'costs.ticketAddItem': 'Додати позицію',
+  'costs.ticketShares': 'Частка кожного',
+  'costs.excluded': 'Не бере участі',
+  'costs.splitBalanced': 'Розподіл збігається із сумою',
+  'costs.splitSumUnder': 'Сума часток: {sum} з {total} (бракує {diff})',
+  'costs.splitSumOver': 'Сума часток: {sum} з {total} (більше на {diff})',
 };
 export default budget;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import ReactDOM from 'react-dom'
+import { createPortal } from 'react-dom'
 import { LucideIcon } from 'lucide-react'
 
 interface MenuItem {
@@ -64,7 +64,7 @@ export function ContextMenu({ menu, onClose }: ContextMenuProps) {
 
   if (!menu) return null
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div ref={ref} className="trek-popover-enter" style={{
       position: 'fixed', left: menu.x, top: menu.y, zIndex: 999999,
       background: 'var(--bg-card)', borderRadius: 10, padding: '4px',
@@ -79,7 +79,7 @@ export function ContextMenu({ menu, onClose }: ContextMenuProps) {
         if (item.divider) return <div key={i} style={{ height: 1, background: 'var(--border-faint)', margin: '3px 6px' }} />
         const Icon = item.icon
         return (
-          <button key={i} onClick={() => { item.onClick?.(); onClose() }} style={{
+          <button type="button" key={i} onClick={() => { item.onClick?.(); onClose() }} style={{
             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
             padding: '7px 10px', borderRadius: 7, border: 'none',
             background: 'none', cursor: 'pointer', fontFamily: 'inherit',

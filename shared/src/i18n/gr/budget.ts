@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Διαγραφή εξόδου;',
+  'costs.confirm.deleteBody': 'Το "{name}" θα διαγραφεί οριστικά.',
   'budget.title': 'Προϋπολογισμός',
   'budget.exportCsv': 'Εξαγωγή CSV',
   'budget.emptyTitle': 'Δεν έχει δημιουργηθεί προϋπολογισμός ακόμη',
@@ -88,6 +90,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Αναίρεση',
   'costs.whatFor': 'Για τι ήταν;',
   'costs.namePlaceholder': 'π.χ. Δείπνο, σουβενίρ, βενζίνη…',
+  'costs.note': 'Σημείωση',
+  'costs.notePlaceholder': 'Τι κάλυπτε, ποιος χρωστάει τι…',
+  'costs.addNote': 'Προσθήκη σημείωσης',
+  'costs.showNote': 'Εμφάνιση σημείωσης',
+  'costs.hideNote': 'Απόκρυψη σημείωσης',
   'costs.totalAmount': 'Συνολικό ποσό',
   'costs.currency': 'Νόμισμα',
   'costs.day': 'Ημέρα',
@@ -111,6 +118,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Τέλη & εισιτήρια',
   'costs.cat.health': 'Υγεία',
   'costs.cat.tips': 'Φιλοδωρήματα',
+  'costs.cat.fuel': 'Καύσιμα',
+  'costs.cat.parking': 'Στάθμευση',
   'costs.cat.other': 'Άλλα',
   'costs.daysCount': '{count} ημέρες',
   'costs.travelers': '{count} ταξιδιώτες',
@@ -130,5 +139,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Όλες οι κατηγορίες',
   'costs.filter.allDays': 'Όλες οι ημέρες',
   'costs.expensesCount': '{count} έξοδα',
+  'costs.ticketItemName': 'Όνομα είδους',
+  'costs.ticketSplitting': 'Μοιράζεται σε:',
+  'costs.ticketAddItem': 'Προσθήκη είδους',
+  'costs.ticketShares': 'Μερίδιο ανά άτομο',
+  'costs.excluded': 'Εκτός',
+  'costs.splitBalanced': 'Ο διαμοιρασμός ταιριάζει με το σύνολο',
+  'costs.splitSumUnder': 'Άθροισμα μεριδίων: {sum} από {total} (λείπουν {diff})',
+  'costs.splitSumOver': 'Άθροισμα μεριδίων: {sum} από {total} ({diff} παραπάνω)',
 };
 export default budget;

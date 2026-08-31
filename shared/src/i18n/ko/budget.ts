@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': '지출을 삭제할까요?',
+  'costs.confirm.deleteBody': '"{name}"이(가) 영구적으로 삭제됩니다.',
   'budget.title': '예산',
   'budget.exportCsv': 'CSV 내보내기',
   'budget.emptyTitle': '아직 예산이 없습니다',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': '실행 취소',
   'costs.whatFor': '무엇을 위한 것인가요?',
   'costs.namePlaceholder': '예: 저녁 식사, 기념품, 주유…',
+  'costs.note': '메모',
+  'costs.notePlaceholder': '무엇을 샀는지, 누가 갚아야 하는지…',
+  'costs.addNote': '메모 추가',
+  'costs.showNote': '메모 보기',
+  'costs.hideNote': '메모 숨기기',
   'costs.totalAmount': '총 금액',
   'costs.currency': '통화',
   'costs.day': '날짜',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': '요금 및 입장권',
   'costs.cat.health': '건강',
   'costs.cat.tips': '팁',
+  'costs.cat.fuel': '연료',
+  'costs.cat.parking': '주차',
   'costs.cat.other': '기타',
   'costs.daysCount': '{count}일',
   'costs.travelers': '여행자 {count}명',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': '모든 카테고리',
   'costs.filter.allDays': '모든 날짜',
   'costs.expensesCount': '지출 {count}건',
+  'costs.ticketItemName': '항목 이름',
+  'costs.ticketSplitting': '나눔:',
+  'costs.ticketAddItem': '항목 추가',
+  'costs.ticketShares': '개인별 부담',
+  'costs.excluded': '제외됨',
+  'costs.splitBalanced': '분할 금액이 합계와 일치합니다',
+  'costs.splitSumUnder': '분할 합계: {total} 중 {sum} ({diff} 부족)',
+  'costs.splitSumOver': '분할 합계: {total} 중 {sum} ({diff} 초과)',
 };
 export default budget;

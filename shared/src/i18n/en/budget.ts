@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Delete expense?',
+  'costs.confirm.deleteBody': '"{name}" will be permanently deleted.',
   'budget.title': 'Budget',
   'budget.exportCsv': 'Export CSV',
   'budget.emptyTitle': 'No budget created yet',
@@ -90,6 +92,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Undo',
   'costs.whatFor': 'What was it for?',
   'costs.namePlaceholder': 'e.g. Dinner, souvenirs, gas…',
+  'costs.note': 'Note',
+  'costs.notePlaceholder': 'What it covered, who owes what back…',
+  'costs.addNote': 'Add note',
+  'costs.showNote': 'Show note',
+  'costs.hideNote': 'Hide note',
   'costs.totalAmount': 'Total amount',
   'costs.currency': 'Currency',
   'costs.day': 'Day',
@@ -117,6 +124,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Fees & tickets',
   'costs.cat.health': 'Health',
   'costs.cat.tips': 'Tips',
+  'costs.cat.fuel': 'Fuel',
+  'costs.cat.parking': 'Parking',
   'costs.cat.other': 'Other',
   'costs.daysCount': '{count} days',
   'costs.travelers': '{count} travelers',
@@ -129,6 +138,14 @@ const budget: TranslationStrings = {
   'costs.unfinishedHint': 'Total only — not settled yet',
   'costs.tapToInclude': 'Tap to include',
   'costs.amount': 'Amount',
+  'costs.ticketItemName': 'Item name',
+  'costs.ticketSplitting': 'Splitting:',
+  'costs.ticketAddItem': 'Add item',
+  'costs.ticketShares': 'Individual shares',
+  'costs.excluded': 'Excluded',
+  'costs.splitBalanced': 'Split matches total',
+  'costs.splitSumUnder': 'Sum of splits: {sum} of {total} (under by {diff})',
+  'costs.splitSumOver': 'Sum of splits: {sum} of {total} (over by {diff})',
 };
 
 export default budget;

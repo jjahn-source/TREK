@@ -46,6 +46,8 @@ export const COST_CATEGORIES = [
   'fees',
   'health',
   'tips',
+  'fuel',
+  'parking',
   'other',
 ] as const;
 export type CostCategory = (typeof COST_CATEGORIES)[number];
@@ -70,6 +72,7 @@ const RESERVATION_TYPE_TO_COST_CATEGORY: Record<string, CostCategory> = {
   hotel: 'accommodation',
   accommodation: 'accommodation',
   lodging: 'accommodation',
+  parking: 'parking',
   restaurant: 'food',
   activity: 'activities',
 };
@@ -112,7 +115,12 @@ export const budgetItemSchema = z.object({
   persons: z.number().nullable().optional(),
   days: z.number().nullable().optional(),
   note: z.string().nullable().optional(),
+  /** Itemized receipt behind a per-item split, as JSON. Its own column since #1658. */
+  ticket_json: z.string().nullable().optional(),
   reservation_id: z.number().nullable().optional(),
+  /** Set when the expense was created from a place (#1298) — the same link
+   *  reservation_id is for a booking, on the other side of the planner. */
+  place_id: z.number().nullable().optional(),
   paid_by_user_id: z.number().nullable().optional(),
   expense_date: z.string().nullable().optional(),
   sort_order: z.number().optional(),
@@ -147,10 +155,14 @@ export const budgetCreateItemRequestSchema = z.object({
   persons: z.number().nullable().optional(),
   days: z.number().nullable().optional(),
   note: z.string().nullable().optional(),
+  ticket_json: z.string().nullable().optional(),
   expense_date: z.string().nullable().optional(),
   // Link this expense to a reservation (e.g. created from a booking's
   // "add expense" flow). The server stores it on budget_items.reservation_id.
   reservation_id: z.number().optional(),
+  // The same for a place: the place form's "add expense" flow saves the place
+  // first, then creates the expense against it (#1298).
+  place_id: z.number().optional(),
 });
 export type BudgetCreateItemRequest = z.infer<typeof budgetCreateItemRequestSchema>;
 
@@ -167,6 +179,7 @@ export const budgetUpdateItemRequestSchema = z.object({
   persons: z.number().nullable().optional(),
   days: z.number().nullable().optional(),
   note: z.string().nullable().optional(),
+  ticket_json: z.string().nullable().optional(),
   expense_date: z.string().nullable().optional(),
 });
 export type BudgetUpdateItemRequest = z.infer<typeof budgetUpdateItemRequestSchema>;

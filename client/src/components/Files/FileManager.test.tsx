@@ -176,7 +176,7 @@ describe('FileManager', () => {
     await user.click(trashBtn);
 
     // Trashed file should appear
-    await screen.findByText('old.pdf');
+    expect(await screen.findByText('old.pdf')).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-007: restore button calls filesApi.restore', async () => {
@@ -407,7 +407,7 @@ describe('FileManager', () => {
     const assignBtn = screen.getByTitle(/assign/i);
     await user.click(assignBtn);
 
-    await screen.findByText('Eiffel Tower');
+    expect(await screen.findByText('Eiffel Tower')).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-021: file description is shown when present', () => {
@@ -445,7 +445,7 @@ describe('FileManager', () => {
     const assignBtn = screen.getByTitle(/assign/i);
     await user.click(assignBtn);
 
-    await screen.findByText('Hotel Paris');
+    expect(await screen.findByText('Hotel Paris')).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-024: clicking a place in assign modal calls filesApi.update', async () => {
@@ -492,7 +492,7 @@ describe('FileManager', () => {
 
     await user.click(screen.getByTitle(/assign/i));
     await screen.findByText('Notre Dame');
-    await screen.findByText('Airbnb');
+    expect(await screen.findByText('Airbnb')).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-027: paste event uploads file when user can upload', async () => {
@@ -543,7 +543,7 @@ describe('FileManager', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByTitle(/assign/i));
-    await screen.findByText('Arc de Triomphe');
+    expect(await screen.findByText('Arc de Triomphe')).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-030: file with linked place shows source badge', async () => {
@@ -554,7 +554,7 @@ describe('FileManager', () => {
     render(<FileManager {...defaultProps} files={[file]} places={[place]} />);
 
     // Source badge text includes place name
-    await screen.findByText(/Colosseum/);
+    expect(await screen.findByText(/Colosseum/)).toBeInTheDocument();
   });
 
   it('FE-COMP-FILEMANAGER-031: unlink place from assign modal calls filesApi.update', async () => {

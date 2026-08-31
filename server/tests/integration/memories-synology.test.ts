@@ -8,7 +8,7 @@
  *
  * No real HTTP calls are made.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Application } from 'express';
 import type { INestApplication } from '@nestjs/common';
@@ -704,7 +704,7 @@ describe('Synology auth checks', () => {
 // ── Album sync ────────────────────────────────────────────────────────────────
 
 import { addAlbumLink } from '../helpers/factories';
-import { encrypt_api_key } from '../../src/services/apiKeyCrypto';
+import { encrypt_api_key } from '../../src/nest/common/crypto/apiKeyCrypto';
 
 describe('Synology syncSynologyAlbumLink', () => {
   it('SYNO-050 — POST sync happy path: trip owner with album link saves photos to DB', async () => {
@@ -977,7 +977,7 @@ describe('Synology searchSynologyPhotos date range', () => {
                     thumbnail: { cache_key: '201_abc' },
                     address: { city: 'Kyoto', country: 'Japan', state: 'Kyoto' },
                     exif: {},
-                    gps: {},
+                    gps: { latitude: 35.0116, longitude: 135.7681 },
                     resolution: { width: 4000, height: 3000 },
                     orientation: 1,
                     description: null,
@@ -997,6 +997,7 @@ describe('Synology searchSynologyPhotos date range', () => {
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.assets)).toBe(true);
+    expect(res.body.assets[0]).toMatchObject({ lat: 35.0116, lng: 135.7681 });
 
     // Verify date parameters were forwarded in the Synology API request body
     expect(capturedBody).not.toBeNull();
@@ -1006,6 +1007,9 @@ describe('Synology searchSynologyPhotos date range', () => {
     expect(Number(startTime)).toBeGreaterThan(0);
     expect(endTime).toBeDefined();
     expect(Number(endTime)).toBeGreaterThan(Number(startTime));
+
+    const additional = JSON.parse(capturedBody!.get('additional') || '[]') as string[];
+    expect(additional).toContain('gps');
   });
 
   it('SYNO-071 — POST /search without date range omits start_time and end_time', async () => {
@@ -1182,8 +1186,16 @@ describe('Synology SSRF blocked error handling', () => {
 
 // ── Passphrase persistence fixes ─────────────────────────────────────────────
 
-import { getOrCreateTrekPhoto, deleteTrekPhotoIfOrphan } from '../../src/services/memories/photoResolverService';
-import { decrypt_api_key } from '../../src/services/apiKeyCrypto';
+import { TrekPhotosRepository } from '../../src/nest/photos/trek-photos.repository';
+import { DatabaseService } from '../../src/nest/database/database.service';
+import { db as trekDb } from '../../src/db/database';
+
+// Was photos.bridge, which existed for consumers outside the container and had
+// none left. The repository is what it delegated to.
+const trekPhotos = new TrekPhotosRepository(new DatabaseService(trekDb));
+const getOrCreateTrekPhoto = (...a: Parameters<TrekPhotosRepository['getOrCreate']>) => trekPhotos.getOrCreate(...a);
+const deleteTrekPhotoIfOrphan = (id: number) => trekPhotos.deleteIfOrphan(id);
+import { decrypt_api_key } from '../../src/nest/common/crypto/apiKeyCrypto';
 
 describe('trek_photos passphrase healing (SYNO-090)', () => {
   it('SYNO-090 — getOrCreateTrekPhoto overwrites an existing bad passphrase when a new one is supplied', () => {

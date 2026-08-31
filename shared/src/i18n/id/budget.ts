@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Hapus pengeluaran?',
+  'costs.confirm.deleteBody': '"{name}" akan dihapus secara permanen.',
   'budget.title': 'Anggaran',
   'budget.exportCsv': 'Ekspor CSV',
   'budget.emptyTitle': 'Belum ada anggaran',
@@ -87,6 +89,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Urungkan',
   'costs.whatFor': 'Untuk apa?',
   'costs.namePlaceholder': 'mis. Makan malam, oleh-oleh, bensin…',
+  'costs.note': 'Catatan',
+  'costs.notePlaceholder': 'Apa saja yang termasuk, siapa berutang apa…',
+  'costs.addNote': 'Tambah catatan',
+  'costs.showNote': 'Tampilkan catatan',
+  'costs.hideNote': 'Sembunyikan catatan',
   'costs.totalAmount': 'Jumlah total',
   'costs.currency': 'Mata uang',
   'costs.day': 'Hari',
@@ -110,6 +117,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Biaya & tiket',
   'costs.cat.health': 'Kesehatan',
   'costs.cat.tips': 'Tip',
+  'costs.cat.fuel': 'Bahan bakar',
+  'costs.cat.parking': 'Parkir',
   'costs.cat.other': 'Lainnya',
   'costs.daysCount': '{count} hari',
   'costs.travelers': '{count} pelancong',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.filter.allCategories': 'Semua kategori',
   'costs.filter.allDays': 'Semua hari',
   'costs.expensesCount': '{count} pengeluaran',
+  'costs.ticketItemName': 'Nama item',
+  'costs.ticketSplitting': 'Dibagi dengan:',
+  'costs.ticketAddItem': 'Tambah item',
+  'costs.ticketShares': 'Bagian tiap orang',
+  'costs.excluded': 'Tidak termasuk',
+  'costs.splitBalanced': 'Pembagian sudah pas dengan total',
+  'costs.splitSumUnder': 'Jumlah bagian: {sum} dari {total} (kurang {diff})',
+  'costs.splitSumOver': 'Jumlah bagian: {sum} dari {total} (lebih {diff})',
 };
 export default budget;

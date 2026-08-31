@@ -1,6 +1,8 @@
 import type { TranslationStrings } from '../types';
 
 const budget: TranslationStrings = {
+  'costs.confirm.deleteTitle': 'Ausgabe löschen?',
+  'costs.confirm.deleteBody': '"{name}" wird unwiderruflich gelöscht.',
   'budget.title': 'Budget',
   'budget.exportCsv': 'CSV exportieren',
   'budget.emptyTitle': 'Noch kein Budget erstellt',
@@ -90,6 +92,11 @@ const budget: TranslationStrings = {
   'costs.undo': 'Rückgängig',
   'costs.whatFor': 'Wofür war es?',
   'costs.namePlaceholder': 'z.B. Abendessen, Souvenirs, Benzin…',
+  'costs.note': 'Notiz',
+  'costs.notePlaceholder': 'Was darin enthalten war, wer was zurückzahlt…',
+  'costs.addNote': 'Notiz hinzufügen',
+  'costs.showNote': 'Notiz anzeigen',
+  'costs.hideNote': 'Notiz ausblenden',
   'costs.totalAmount': 'Gesamtbetrag',
   'costs.currency': 'Währung',
   'costs.day': 'Tag',
@@ -113,6 +120,8 @@ const budget: TranslationStrings = {
   'costs.cat.fees': 'Gebühren & Tickets',
   'costs.cat.health': 'Gesundheit',
   'costs.cat.tips': 'Trinkgeld',
+  'costs.cat.fuel': 'Kraftstoff',
+  'costs.cat.parking': 'Parken',
   'costs.cat.other': 'Sonstiges',
   'costs.daysCount': '{count} Tage',
   'costs.travelers': '{count} Reisende',
@@ -129,5 +138,13 @@ const budget: TranslationStrings = {
   'costs.splitEqually': 'Gleichmäßig',
   'costs.splitCustom': 'Individuell',
   'costs.splitTicket': 'Beleg',
+  'costs.ticketItemName': 'Artikelname',
+  'costs.ticketSplitting': 'Aufteilen auf:',
+  'costs.ticketAddItem': 'Artikel hinzufügen',
+  'costs.ticketShares': 'Anteil pro Person',
+  'costs.excluded': 'Nicht dabei',
+  'costs.splitBalanced': 'Aufteilung passt zur Summe',
+  'costs.splitSumUnder': 'Summe der Anteile: {sum} von {total} (es fehlen {diff})',
+  'costs.splitSumOver': 'Summe der Anteile: {sum} von {total} ({diff} zu viel)',
 };
 export default budget;
