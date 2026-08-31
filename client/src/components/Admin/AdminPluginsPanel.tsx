@@ -9,7 +9,7 @@ import {
   Wallet, Puzzle, MapPin, ListChecks, Pencil, Tag, FileText, Route, Navigation, Clock, LocateFixed, Palette, Bot,
 } from 'lucide-react'
 import PluginIcon from '../shared/PluginIcon'
-import { adminApi } from '../../api/client'
+import { adminApi, type PluginUserSettingField } from '../../api/client'
 import { usePluginStore } from '../../store/pluginStore'
 import { useTranslation } from '../../i18n'
 import { useToast } from '../shared/Toast'
@@ -407,6 +407,14 @@ export default function AdminPluginsPanel() {
   const [retrusting, setRetrusting] = useState(false)
   const [detailFor, setDetailFor] = useState<RegistryItem | null>(null)
   const [errorsFor, setErrorsFor] = useState<{ id: string; rows: Array<{ ts: string; level: string; message: string }> } | null>(null)
+  // Admin-owned INSTANCE settings. `dirty` tracks which keys the admin actually touched:
+  // secrets arrive masked, so saving every field would write the mask back as the new
+  // secret. Only touched keys are sent.
+  const [settingsFor, setSettingsFor] = useState<
+    { id: string; fields: PluginUserSettingField[]; values: Record<string, string>; dirty: Record<string, boolean> } | null
+  >(null)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
   const [egressFor, setEgressFor] = useState<{ id: string; supported: boolean; hosts: string[] } | null>(null)
   const [egressDraft, setEgressDraft] = useState('')
   const [egressSaving, setEgressSaving] = useState(false)
@@ -548,6 +556,42 @@ export default function AdminPluginsPanel() {
     const f = e.dataTransfer.files?.[0]
     if (f) void uploadPlugin(f)
   }
+  const openSettings = (id: string) => {
+    setMenu(null)
+    setSettingsError('')
+    adminApi.pluginConfig(id)
+      .then(d => {
+        const values: Record<string, string> = {}
+        for (const f of d.fields) {
+          const v = (d.config as Record<string, unknown>)[f.key]
+          values[f.key] = v == null ? '' : String(v)
+        }
+        setSettingsFor({ id, fields: d.fields, values, dirty: {} })
+      })
+      .catch(() => setSettingsFor({ id, fields: [], values: {}, dirty: {} }))
+  }
+
+  const saveSettings = async () => {
+    if (!settingsFor) return
+    setSettingsSaving(true)
+    setSettingsError('')
+    try {
+      const patch: Record<string, string> = {}
+      for (const k of Object.keys(settingsFor.dirty)) patch[k] = settingsFor.values[k] ?? ''
+      await adminApi.pluginSetConfig(settingsFor.id, patch)
+      // Re-spawn so the plugin picks the new config up: its runtime reads settings at
+      // init, exactly like the egress list.
+      await adminApi.pluginReload(settingsFor.id).catch(() => {})
+      setSettingsFor(null)
+      refresh()
+    } catch (e) {
+      const err = e as { response?: { data?: { error?: string } } }
+      setSettingsError(err.response?.data?.error || t('common.error'))
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   const openEgress = (id: string) => {
     setMenu(null)
     setEgressDraft(''); setEgressError('')
@@ -962,6 +1006,7 @@ export default function AdminPluginsPanel() {
                   code: p.updateBlock!.code, detail: p.updateBlock!.detail,
                 })}
                 onErrors={() => openErrors(p.id)} onEgress={() => openEgress(p.id)}
+                onSettings={() => openSettings(p.id)}
                 onUninstall={() => { setMenu(null); setConfirmUninstall(p) }} />
             ))}
           </div>
@@ -994,6 +1039,66 @@ export default function AdminPluginsPanel() {
                   </div>
                 ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin-owned instance settings. A plugin whose manifest declares none renders an
+          explicit "nothing to configure" line rather than an empty dialog. */}
+      {settingsFor && (
+        <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setSettingsFor(null)}>
+          <div role="presentation" className="bg-surface-card border border-edge rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-modal" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-3.5 border-b border-edge-secondary flex items-center justify-between">
+              <span className="text-sm font-semibold text-content flex items-center gap-2"><SlidersHorizontal size={15} /> {settingsFor.id} — {t('admin.plugins.settings')}</span>
+              <button type="button" onClick={() => setSettingsFor(null)} className="text-content-faint hover:text-content"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {settingsFor.fields.length === 0 ? (
+                <p className="text-sm text-content-faint">{t('admin.plugins.settings.none')}</p>
+              ) : (
+                <>
+                  <p className="text-xs text-content-faint">{t('admin.plugins.settings.hint')}</p>
+                  {settingsFor.fields.map(f => (
+                    <label key={f.key} className="block space-y-1.5">
+                      <span className="text-sm font-medium text-content">
+                        {f.label || f.key}
+                        {f.required && <span className="text-danger ml-0.5">*</span>}
+                      </span>
+                      {f.input_type === 'select' && f.options ? (
+                        <select
+                          value={settingsFor.values[f.key] ?? ''}
+                          onChange={e => setSettingsFor(v => v && ({ ...v, values: { ...v.values, [f.key]: e.target.value }, dirty: { ...v.dirty, [f.key]: true } }))}
+                          className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-content"
+                        >
+                          {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          type={f.secret ? 'password' : (f.input_type === 'number' ? 'number' : 'text')}
+                          value={settingsFor.values[f.key] ?? ''}
+                          placeholder={f.placeholder || ''}
+                          autoComplete={f.secret ? 'new-password' : 'off'}
+                          onChange={e => setSettingsFor(v => v && ({ ...v, values: { ...v.values, [f.key]: e.target.value }, dirty: { ...v.dirty, [f.key]: true } }))}
+                          className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-content"
+                        />
+                      )}
+                      {f.hint && <span className="block text-xs text-content-faint">{f.hint}</span>}
+                    </label>
+                  ))}
+                  {settingsError && <p className="text-xs text-danger">{settingsError}</p>}
+                  <p className="text-xs text-content-faint">{t('admin.plugins.settings.restartNote')}</p>
+                </>
+              )}
+            </div>
+            {settingsFor.fields.length > 0 && (
+              <div className="px-5 py-3.5 border-t border-edge-secondary flex justify-end gap-2">
+                <button type="button" onClick={() => setSettingsFor(null)}
+                  className="rounded-lg border border-edge px-3 py-2 text-sm text-content">{t('common.cancel')}</button>
+                <button type="button" disabled={settingsSaving || Object.keys(settingsFor.dirty).length === 0}
+                  onClick={() => void saveSettings()}
+                  className="rounded-lg bg-content px-3 py-2 text-sm text-surface disabled:opacity-50">{t('common.save')}</button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1185,11 +1290,11 @@ function EmptyState({ t, onDiscover }: { t: T; onDiscover: () => void }) {
   )
 }
 
-function InstalledRow({ p, t, busy, menu, setMenu, hasUpdate, latestVer, newerIncompatible, blocked, onToggle, onUpdate, onRestart, onChangeVersion, onResume, onReviewBlock, onErrors, onEgress, onUninstall }: {
+function InstalledRow({ p, t, busy, menu, setMenu, hasUpdate, latestVer, newerIncompatible, blocked, onToggle, onUpdate, onRestart, onChangeVersion, onResume, onReviewBlock, onErrors, onEgress, onSettings, onUninstall }: {
   p: PluginRow; t: T; busy: string | null; menu: string | null; setMenu: (v: string | null) => void
   hasUpdate: boolean; latestVer?: string; newerIncompatible: { version: string; range: string } | null; blocked: boolean
   onToggle: () => void; onUpdate: () => void; onRestart: () => void; onChangeVersion: () => void; onResume: () => void; onReviewBlock: () => void
-  onErrors: () => void; onEgress: () => void; onUninstall: () => void
+  onErrors: () => void; onEgress: () => void; onSettings: () => void; onUninstall: () => void
 }) {
   const caps = deriveCaps(parseJson<string[]>(p.permissions, []), parseJson<{ widget?: { slot?: string } }>(p.capabilities, {}), t)
   const deps = deriveDeps(p, t)
@@ -1335,6 +1440,7 @@ function InstalledRow({ p, t, busy, menu, setMenu, hasUpdate, latestVer, newerIn
                 <MenuItem icon={<RotateCw size={14} />} label={t('admin.plugins.restart')} onClick={onRestart} />
               )}
               <MenuItem icon={<Bug size={14} />} label={t('admin.plugins.viewErrors')} onClick={onErrors} />
+              <MenuItem icon={<SlidersHorizontal size={14} />} label={t('admin.plugins.settings')} onClick={onSettings} />
               <MenuItem icon={<Globe size={14} />} label={t('admin.plugins.allowedHosts')} onClick={onEgress} />
               {/* Registry plugins only — a sideload/dev-link has no registry versions to pick from. */}
               {isRegistrySourced(p.source_repo) && (

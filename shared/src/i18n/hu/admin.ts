@@ -193,6 +193,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin deaktiválva',
   'admin.plugins.viewErrors': 'Hibanapló megtekintése',
   'admin.plugins.errorLog': 'Hibanapló',
+  'admin.plugins.settings': 'Beállítások',
+  'admin.plugins.settings.none': 'Ennek a bővítménynek nincsenek beállításai.',
+  'admin.plugins.settings.hint':
+    'Ezek a beállítások ehhez a kiszolgálóhoz tartoznak és mindenkire vonatkoznak. A kötelező mezőket * jelöli.',
+  'admin.plugins.settings.restartNote': 'A mentés újraindítja a bővítményt, hogy átvegye az új értékeket.',
   'admin.plugins.allowedHosts': 'Engedélyezett hosztok',
   'admin.plugins.allowedHosts.hint':
     'Ez a bővítmény olyan szolgáltatással kommunikál, amelyet csak te tudsz megnevezni (saját üzemeltetésű kiszolgáló). Add meg a hosztokat, amelyeket elérhet — másokat nem.',

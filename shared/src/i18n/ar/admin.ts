@@ -210,6 +210,10 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'تم تعطيل الإضافة',
   'admin.plugins.viewErrors': 'عرض سجل الأخطاء',
   'admin.plugins.errorLog': 'سجل الأخطاء',
+  'admin.plugins.settings': 'الإعدادات',
+  'admin.plugins.settings.none': 'لا توجد إعدادات لهذه الإضافة.',
+  'admin.plugins.settings.hint': 'هذه الإعدادات تخص هذا الخادم وتنطبق على الجميع. الحقول المطلوبة معلَّمة بـ *.',
+  'admin.plugins.settings.restartNote': 'الحفظ يعيد تشغيل الإضافة لتأخذ القيم الجديدة.',
   'admin.plugins.allowedHosts': 'المضيفون المسموح بهم',
   'admin.plugins.allowedHosts.hint':
     'تتصل هذه الإضافة بخدمة لا يمكن لأحد سواك تسميتها (خادم مستضاف ذاتيًا). أضف المضيفين الذين يمكنها الوصول إليهم — ولن تصل إلى غيرهم.',

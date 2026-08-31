@@ -153,3 +153,64 @@ describe('discoverPlugins', () => {
     });
   });
 });
+
+/**
+ * Instance-setting defaults (#plugins). A field whose value is a constant of the
+ * third-party service — an OAuth authorize URL, an API base — is seeded at discovery so
+ * the admin form opens with only the genuinely per-install fields blank. The invariant
+ * that matters is that seeding never overwrites an operator's choice, INCLUDING a value
+ * they deliberately blanked.
+ */
+describe('instance setting defaults', () => {
+  const withDefaults = {
+    settings: [
+      { key: 'api_base', label: 'API base', scope: 'instance', default: 'https://api.example.com' },
+      { key: 'api_key', label: 'API key', scope: 'instance', secret: true, default: 'should-be-ignored' },
+      { key: 'nickname', label: 'Nickname', scope: 'user', default: 'also-ignored' },
+    ],
+  };
+  const config = (id: string) =>
+    JSON.parse((db.prepare('SELECT config FROM plugins WHERE id = ?').get(id) as { config: string }).config) as Record<string, unknown>;
+
+  it('seeds an instance default the operator has never set', () => {
+    writePlugin('seeded', withDefaults);
+    discoverPlugins(db);
+    expect(config('seeded').api_base).toBe('https://api.example.com');
+  });
+
+  it('never seeds a secret field — a shipped secret is not a secret', () => {
+    writePlugin('seeded', withDefaults);
+    discoverPlugins(db);
+    expect(config('seeded')).not.toHaveProperty('api_key');
+  });
+
+  it('never seeds a user-scope field', () => {
+    writePlugin('seeded', withDefaults);
+    discoverPlugins(db);
+    expect(config('seeded')).not.toHaveProperty('nickname');
+  });
+
+  it('leaves an operator-chosen value alone on re-discovery', () => {
+    writePlugin('seeded', withDefaults);
+    discoverPlugins(db);
+    db.prepare('UPDATE plugins SET config = ? WHERE id = ?').run(JSON.stringify({ api_base: 'https://mine.internal' }), 'seeded');
+    discoverPlugins(db);
+    expect(config('seeded').api_base).toBe('https://mine.internal');
+  });
+
+  it('leaves a deliberately blanked value blank rather than re-seeding it', () => {
+    writePlugin('seeded', withDefaults);
+    discoverPlugins(db);
+    db.prepare('UPDATE plugins SET config = ? WHERE id = ?').run(JSON.stringify({ api_base: '' }), 'seeded');
+    discoverPlugins(db);
+    expect(config('seeded').api_base).toBe('');
+  });
+
+  it('writes nothing at all when no field declares a default', () => {
+    writePlugin('plain', { settings: [{ key: 'x', label: 'X', scope: 'instance' }] });
+    discoverPlugins(db);
+    // Not `{}` — an untouched row keeps the NULL discovery gave it. Seeding must not
+    // materialise a config blob just to prove it ran.
+    expect((db.prepare('SELECT config FROM plugins WHERE id = ?').get('plain') as { config: string | null }).config).toBeNull();
+  });
+});

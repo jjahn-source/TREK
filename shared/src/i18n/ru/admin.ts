@@ -193,6 +193,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Плагин деактивирован',
   'admin.plugins.viewErrors': 'Показать журнал ошибок',
   'admin.plugins.errorLog': 'Журнал ошибок',
+  'admin.plugins.settings': 'Настройки',
+  'admin.plugins.settings.none': 'У этого плагина нет настроек.',
+  'admin.plugins.settings.hint':
+    'Эти настройки принадлежат этому серверу и действуют для всех. Обязательные поля отмечены *.',
+  'admin.plugins.settings.restartNote': 'Сохранение перезапускает плагин, чтобы он принял новые значения.',
   'admin.plugins.allowedHosts': 'Разрешённые хосты',
   'admin.plugins.allowedHosts.hint':
     'Этот плагин обращается к сервису, который можете указать только вы (self-hosted сервер). Добавьте хосты, к которым он может обращаться — к другим он не сможет.',

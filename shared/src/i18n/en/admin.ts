@@ -247,6 +247,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin deactivated',
   'admin.plugins.viewErrors': 'View error log',
   'admin.plugins.errorLog': 'Error log',
+  'admin.plugins.settings': 'Settings',
+  'admin.plugins.settings.none': 'This plugin has no settings to configure.',
+  'admin.plugins.settings.hint':
+    'These settings belong to this server and apply to everyone. Required fields are marked *.',
+  'admin.plugins.settings.restartNote': 'Saving restarts the plugin so it picks up the new values.',
   'admin.plugins.allowedHosts': 'Allowed hosts',
   'admin.plugins.allowedHosts.hint':
     'This plugin talks to a service only you can name. Add the hosts it may reach — it can reach no others.',

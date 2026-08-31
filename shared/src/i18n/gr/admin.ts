@@ -239,6 +239,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Το plugin απενεργοποιήθηκε',
   'admin.plugins.viewErrors': 'Προβολή αρχείου σφαλμάτων',
   'admin.plugins.errorLog': 'Αρχείο σφαλμάτων',
+  'admin.plugins.settings': 'Ρυθμίσεις',
+  'admin.plugins.settings.none': 'Αυτό το πρόσθετο δεν έχει ρυθμίσεις.',
+  'admin.plugins.settings.hint':
+    'Αυτές οι ρυθμίσεις ανήκουν σε αυτόν τον διακομιστή και ισχύουν για όλους. Τα υποχρεωτικά πεδία σημειώνονται με *.',
+  'admin.plugins.settings.restartNote': 'Η αποθήκευση επανεκκινεί το πρόσθετο ώστε να λάβει τις νέες τιμές.',
   'admin.plugins.allowedHosts': 'Επιτρεπόμενοι κόμβοι',
   'admin.plugins.allowedHosts.hint':
     'Αυτό το πρόσθετο επικοινωνεί με μια υπηρεσία που μόνο εσείς μπορείτε να ονομάσετε (αυτο-φιλοξενούμενος διακομιστής). Προσθέστε τους κόμβους που μπορεί να προσεγγίσει — κανέναν άλλον.',

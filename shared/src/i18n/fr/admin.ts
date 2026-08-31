@@ -194,6 +194,12 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin désactivé',
   'admin.plugins.viewErrors': "Voir le journal d'erreurs",
   'admin.plugins.errorLog': "Journal d'erreurs",
+  'admin.plugins.settings': 'Paramètres',
+  'admin.plugins.settings.none': 'Ce plugin n’a aucun paramètre à configurer.',
+  'admin.plugins.settings.hint':
+    'Ces paramètres appartiennent à ce serveur et s’appliquent à tous. Les champs obligatoires sont marqués d’un *.',
+  'admin.plugins.settings.restartNote':
+    'L’enregistrement redémarre le plugin afin qu’il prenne en compte les nouvelles valeurs.',
   'admin.plugins.allowedHosts': 'Hôtes autorisés',
   'admin.plugins.allowedHosts.hint':
     'Ce plugin communique avec un service que vous seul pouvez nommer (un serveur auto-hébergé). Ajoutez les hôtes qu’il peut joindre — il ne joindra aucun autre.',

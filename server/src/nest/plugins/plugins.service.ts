@@ -218,14 +218,25 @@ export class PluginsService {
     return maskSecrets(config, secretKeys);
   }
 
+  /** The plugin's `scope:'instance'` settings fields, in declared order (for the admin
+   *  form). Same projection as the user form; the admin surface is separate only because
+   *  these belong to the operator, not to a user. */
+  instanceSettingsFields(id: string): Array<Record<string, unknown>> {
+    return this.settingsFields(id, 'instance');
+  }
+
   /** The plugin's `scope:'user'` settings fields, in declared order (for the user form). */
   userSettingsFields(id: string): Array<Record<string, unknown>> {
+    return this.settingsFields(id, 'user');
+  }
+
+  private settingsFields(id: string, scope: 'instance' | 'user'): Array<Record<string, unknown>> {
     return this.db
       .prepare(
         `SELECT field_key AS key, label, input_type, placeholder, hint, required, secret, options
-         FROM plugin_settings_fields WHERE plugin_id = ? AND scope = 'user' ORDER BY sort_order, id`,
+         FROM plugin_settings_fields WHERE plugin_id = ? AND scope = ? ORDER BY sort_order, id`,
       )
-      .all(id)
+      .all(id, scope)
       .map((r) => {
         const row = r as Record<string, unknown>;
         return {

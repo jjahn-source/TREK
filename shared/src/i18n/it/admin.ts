@@ -192,6 +192,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin disattivato',
   'admin.plugins.viewErrors': 'Visualizza log errori',
   'admin.plugins.errorLog': 'Log errori',
+  'admin.plugins.settings': 'Impostazioni',
+  'admin.plugins.settings.none': 'Questo plugin non ha impostazioni da configurare.',
+  'admin.plugins.settings.hint':
+    'Queste impostazioni appartengono a questo server e valgono per tutti. I campi obbligatori sono contrassegnati con *.',
+  'admin.plugins.settings.restartNote': 'Il salvataggio riavvia il plugin affinché adotti i nuovi valori.',
   'admin.plugins.allowedHosts': 'Host consentiti',
   'admin.plugins.allowedHosts.hint':
     'Questo plugin comunica con un servizio che solo tu puoi indicare (un server self-hosted). Aggiungi gli host che può raggiungere — non ne raggiungerà altri.',

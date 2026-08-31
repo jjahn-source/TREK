@@ -235,6 +235,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin dinonaktifkan',
   'admin.plugins.viewErrors': 'Lihat log error',
   'admin.plugins.errorLog': 'Log error',
+  'admin.plugins.settings': 'Pengaturan',
+  'admin.plugins.settings.none': 'Plugin ini tidak memiliki pengaturan.',
+  'admin.plugins.settings.hint':
+    'Pengaturan ini milik server ini dan berlaku untuk semua orang. Kolom wajib ditandai *.',
+  'admin.plugins.settings.restartNote': 'Menyimpan akan memulai ulang plugin agar memakai nilai baru.',
   'admin.plugins.allowedHosts': 'Host yang diizinkan',
   'admin.plugins.allowedHosts.hint':
     'Plugin ini berbicara dengan layanan yang hanya Anda yang tahu namanya (server swakelola). Tambahkan host yang boleh dijangkau — selain itu tidak bisa.',

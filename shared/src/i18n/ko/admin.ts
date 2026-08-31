@@ -229,6 +229,10 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': '플러그인이 비활성화되었습니다',
   'admin.plugins.viewErrors': '오류 로그 보기',
   'admin.plugins.errorLog': '오류 로그',
+  'admin.plugins.settings': '설정',
+  'admin.plugins.settings.none': '이 플러그인에는 설정할 항목이 없습니다.',
+  'admin.plugins.settings.hint': '이 설정은 이 서버의 것이며 모든 사용자에게 적용됩니다. 필수 항목은 *로 표시됩니다.',
+  'admin.plugins.settings.restartNote': '저장하면 플러그인이 다시 시작되어 새 값을 적용합니다.',
   'admin.plugins.allowedHosts': '허용된 호스트',
   'admin.plugins.allowedHosts.hint':
     '이 플러그인은 관리자만 알 수 있는 서비스(자체 호스팅 서버)와 통신합니다. 접근을 허용할 호스트를 추가하세요 — 그 외에는 접근할 수 없습니다.',

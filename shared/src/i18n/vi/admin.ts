@@ -251,6 +251,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Đã hủy kích hoạt plugin',
   'admin.plugins.viewErrors': 'Xem nhật ký lỗi',
   'admin.plugins.errorLog': 'Nhật ký lỗi',
+  'admin.plugins.settings': 'Cài đặt',
+  'admin.plugins.settings.none': 'Plugin này không có cài đặt nào.',
+  'admin.plugins.settings.hint':
+    'Các cài đặt này thuộc về máy chủ này và áp dụng cho mọi người. Trường bắt buộc được đánh dấu *.',
+  'admin.plugins.settings.restartNote': 'Lưu sẽ khởi động lại plugin để nó nhận các giá trị mới.',
   'admin.plugins.allowedHosts': 'Máy chủ được phép',
   'admin.plugins.allowedHosts.hint':
     'Plugin này kết nối tới một dịch vụ mà chỉ bạn mới biết tên (máy chủ tự lưu trữ). Hãy thêm các máy chủ mà nó được phép truy cập — ngoài ra không có gì khác.',

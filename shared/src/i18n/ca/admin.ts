@@ -406,6 +406,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Connector desactivat',
   'admin.plugins.viewErrors': "Mostra el registre d'errors",
   'admin.plugins.errorLog': "Registre d'errors",
+  'admin.plugins.settings': 'Configuració',
+  'admin.plugins.settings.none': 'Aquest connector no té cap configuració.',
+  'admin.plugins.settings.hint':
+    'Aquesta configuració pertany a aquest servidor i s’aplica a tothom. Els camps obligatoris estan marcats amb *.',
+  'admin.plugins.settings.restartNote': 'En desar es reinicia el connector perquè agafi els valors nous.',
   'admin.plugins.allowedHosts': 'Amfitrions permesos',
   'admin.plugins.allowedHosts.hint':
     'Aquest connector es comunica amb un servei que només tu pots indicar (un servidor autoallotjat). Afegeix els amfitrions als quals pot accedir; no pot accedir a cap altre.',

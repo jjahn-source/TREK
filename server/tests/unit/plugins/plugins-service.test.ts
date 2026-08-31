@@ -222,6 +222,7 @@ describe('PluginsFeedController (client feed)', () => {
 describe('PluginsController M2 endpoints', () => {
   const svc = {
     getInstanceConfig: vi.fn(() => ({ a: 1 })),
+    instanceSettingsFields: vi.fn(() => [{ key: 'a', label: 'A', input_type: 'text', required: false, secret: false }]),
     updateInstanceConfig: vi.fn(() => ({ a: 2 })),
   } as unknown as PluginsService;
   // None of the endpoints below carry the marker, so the ordinary install is the
@@ -237,7 +238,10 @@ describe('PluginsController M2 endpoints', () => {
   it('get/update config delegate to the service', () => {
     const rt = { activate: vi.fn(), deactivate: vi.fn(), isActive: vi.fn() } as never;
     const c = new PluginsController(svc, rt, {} as never, envStub);
-    expect(c.getConfig('x')).toEqual({ config: { a: 1 } });
+    expect(c.getConfig('x')).toEqual({
+      fields: [{ key: 'a', label: 'A', input_type: 'text', required: false, secret: false }],
+      config: { a: 1 },
+    });
     expect(c.updateConfig('x', { a: 2 })).toEqual({ config: { a: 2 } });
   });
 

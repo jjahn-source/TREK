@@ -191,6 +191,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin deaktivován',
   'admin.plugins.viewErrors': 'Zobrazit protokol chyb',
   'admin.plugins.errorLog': 'Protokol chyb',
+  'admin.plugins.settings': 'Nastavení',
+  'admin.plugins.settings.none': 'Tento plugin nemá žádná nastavení.',
+  'admin.plugins.settings.hint':
+    'Tato nastavení patří tomuto serveru a platí pro všechny. Povinná pole jsou označena *.',
+  'admin.plugins.settings.restartNote': 'Uložení restartuje plugin, aby načetl nové hodnoty.',
   'admin.plugins.allowedHosts': 'Povolení hostitelé',
   'admin.plugins.allowedHosts.hint':
     'Tento plugin komunikuje se službou, kterou umíš pojmenovat jen ty (self-hosted server). Přidej hostitele, na které smí — na jiné se nedostane.',

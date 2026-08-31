@@ -138,9 +138,12 @@ export class PluginsController {
     }
   }
 
+  /** The plugin's instance settings: the declared field descriptors AND the operator's
+   *  current values (secrets masked). Fields ship with the values so the admin form is
+   *  one request, and so a plugin that declares none renders nothing at all. */
   @Get(':id/config')
   getConfig(@Param('id') id: string) {
-    return { config: this.plugins.getInstanceConfig(id) };
+    return { fields: this.plugins.instanceSettingsFields(id), config: this.plugins.getInstanceConfig(id) };
   }
 
   @Put(':id/config')

@@ -27,6 +27,12 @@ export interface ManifestSettingField {
   required?: boolean;
   secret?: boolean;
   scope?: 'instance' | 'user';
+  /** Seed value for an instance field, applied at install when the operator has set
+   *  nothing. For settings that are constants of the third-party service (an OAuth
+   *  authorize URL, an API base) rather than decisions an operator makes: it opens the
+   *  admin form with only the genuinely per-install fields blank. Never honoured for a
+   *  `secret` field — a shipped secret is not a secret. */
+  default?: string;
   options?: Array<{ value: string; label: string }>;
   oauth?: { initPath?: string; callbackPath?: string };
 }
@@ -537,6 +543,7 @@ function parseSettings(raw: unknown): ManifestSettingField[] {
       required: !!s.required,
       secret: !!s.secret,
       scope: s.scope === 'user' ? 'user' : 'instance',
+      default: s.secret ? undefined : optStr(s.default),
       options: parseSettingOptions(s.options),
       oauth: s.oauth && typeof s.oauth === 'object' ? (s.oauth as { initPath?: string; callbackPath?: string }) : undefined,
     }))

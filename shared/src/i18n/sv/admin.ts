@@ -252,6 +252,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Pluginet har inaktiverats',
   'admin.plugins.viewErrors': 'Visa felloggen',
   'admin.plugins.errorLog': 'Fellogg',
+  'admin.plugins.settings': 'Inställningar',
+  'admin.plugins.settings.none': 'Det här tillägget har inga inställningar.',
+  'admin.plugins.settings.hint':
+    'De här inställningarna hör till den här servern och gäller alla. Obligatoriska fält är märkta med *.',
+  'admin.plugins.settings.restartNote': 'När du sparar startas tillägget om så att det använder de nya värdena.',
   'admin.plugins.allowedHosts': 'Tillåtna värdar',
   'admin.plugins.allowedHosts.hint':
     'Detta plugin pratar med en tjänst som bara du kan namnge (en självhostad server). Lägg till de värdar det får nå — inga andra.',

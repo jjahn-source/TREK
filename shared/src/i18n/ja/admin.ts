@@ -224,6 +224,10 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'プラグインを無効化しました',
   'admin.plugins.viewErrors': 'エラーログを表示',
   'admin.plugins.errorLog': 'エラーログ',
+  'admin.plugins.settings': '設定',
+  'admin.plugins.settings.none': 'このプラグインに設定項目はありません。',
+  'admin.plugins.settings.hint': 'これらの設定はこのサーバーのもので、全員に適用されます。必須項目には * が付いています。',
+  'admin.plugins.settings.restartNote': '保存するとプラグインが再起動し、新しい値が反映されます。',
   'admin.plugins.allowedHosts': '許可するホスト',
   'admin.plugins.allowedHosts.hint':
     'このプラグインは、あなたしか指定できないサービス（セルフホストのサーバー）と通信します。到達を許可するホストを追加してください。それ以外には到達できません。',

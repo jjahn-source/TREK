@@ -186,6 +186,10 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': '插件已停用',
   'admin.plugins.viewErrors': '查看错误日志',
   'admin.plugins.errorLog': '错误日志',
+  'admin.plugins.settings': '设置',
+  'admin.plugins.settings.none': '此插件没有可配置的设置。',
+  'admin.plugins.settings.hint': '这些设置属于本服务器，对所有人生效。必填项以 * 标记。',
+  'admin.plugins.settings.restartNote': '保存后会重启插件，使其读取新的值。',
   'admin.plugins.allowedHosts': '允许的主机',
   'admin.plugins.allowedHosts.hint':
     '此插件会连接一个只有你才知道地址的服务（自托管服务器）。请添加它可以访问的主机 —— 其他主机一概无法访问。',

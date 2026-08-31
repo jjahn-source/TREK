@@ -193,6 +193,12 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Plugin gedeactiveerd',
   'admin.plugins.viewErrors': 'Foutenlog bekijken',
   'admin.plugins.errorLog': 'Foutenlog',
+  'admin.plugins.settings': 'Instellingen',
+  'admin.plugins.settings.none': 'Deze plug-in heeft geen instellingen.',
+  'admin.plugins.settings.hint':
+    'Deze instellingen horen bij deze server en gelden voor iedereen. Verplichte velden zijn gemarkeerd met *.',
+  'admin.plugins.settings.restartNote':
+    'Bij opslaan start de plug-in opnieuw op zodat de nieuwe waarden worden gebruikt.',
   'admin.plugins.allowedHosts': 'Toegestane hosts',
   'admin.plugins.allowedHosts.hint':
     'Deze plug-in praat met een dienst die alleen jij kunt benoemen (een zelf-gehoste server). Voeg de hosts toe die hij mag bereiken — andere bereikt hij niet.',

@@ -226,6 +226,10 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': '外掛已停用',
   'admin.plugins.viewErrors': '檢視錯誤日誌',
   'admin.plugins.errorLog': '錯誤日誌',
+  'admin.plugins.settings': '設定',
+  'admin.plugins.settings.none': '此外掛沒有可設定的項目。',
+  'admin.plugins.settings.hint': '這些設定屬於本伺服器，對所有人生效。必填欄位以 * 標記。',
+  'admin.plugins.settings.restartNote': '儲存後會重新啟動外掛，讓它讀取新的值。',
   'admin.plugins.allowedHosts': '允許的主機',
   'admin.plugins.allowedHosts.hint':
     '此外掛會連線到只有你才知道位址的服務（自架伺服器）。請新增它可以存取的主機 —— 其他主機一律無法存取。',

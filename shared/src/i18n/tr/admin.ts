@@ -237,6 +237,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Eklenti devre dışı bırakıldı',
   'admin.plugins.viewErrors': 'Hata günlüğünü görüntüle',
   'admin.plugins.errorLog': 'Hata günlüğü',
+  'admin.plugins.settings': 'Ayarlar',
+  'admin.plugins.settings.none': 'Bu eklentinin yapılandırılacak ayarı yok.',
+  'admin.plugins.settings.hint':
+    'Bu ayarlar bu sunucuya aittir ve herkes için geçerlidir. Zorunlu alanlar * ile işaretlidir.',
+  'admin.plugins.settings.restartNote': 'Kaydetmek, yeni değerleri alması için eklentiyi yeniden başlatır.',
   'admin.plugins.allowedHosts': 'İzin verilen ana bilgisayarlar',
   'admin.plugins.allowedHosts.hint':
     'Bu eklenti yalnızca sizin adlandırabileceğiniz bir hizmete bağlanır (kendi barındırdığınız sunucu). Erişebileceği ana bilgisayarları ekleyin — başkasına erişemez.',

@@ -559,6 +559,13 @@ export const adminApi = {
   // Operator-supplied egress hosts: a plugin talking to a SELF-HOSTED service can't name
   // the operator's hostname in its manifest, so the admin adds it here. Saving re-spawns
   // the plugin with the widened allow-list.
+  // A plugin's admin-owned INSTANCE settings: the declared field descriptors plus the
+  // operator's current values. Secrets come back masked and are only re-sent when the
+  // admin actually edits them, so a save can never overwrite a stored secret with dots.
+  pluginConfig: (id: string): Promise<{ fields: PluginUserSettingField[]; config: Record<string, unknown> }> =>
+    apiClient.get(`/admin/plugins/${id}/config`).then(r => r.data),
+  pluginSetConfig: (id: string, config: Record<string, string>): Promise<{ config: Record<string, unknown> }> =>
+    apiClient.put(`/admin/plugins/${id}/config`, config).then(r => r.data),
   pluginEgressHosts: (id: string): Promise<{ supported: boolean; hosts: string[] }> =>
     apiClient.get(`/admin/plugins/${id}/egress-hosts`).then(r => r.data),
   pluginSetEgressHosts: (id: string, hosts: string[]): Promise<{ hosts: string[] }> =>

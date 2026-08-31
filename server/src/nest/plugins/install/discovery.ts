@@ -107,4 +107,29 @@ function upsert(db: BetterSqlite3.Database, m: PluginManifest): void {
       i,
     );
   });
+
+  // Seed instance-scope defaults for keys the operator has never set. Only ABSENT keys
+  // are filled, so this can re-run on every discovery/update without ever clobbering a
+  // value someone chose — including one they deliberately blanked back to "", which is
+  // present and therefore left alone. Secrets are excluded upstream in the manifest
+  // parser, so nothing written here is sensitive and no encryption is needed.
+  const seeds = m.settings.filter((f) => (f.scope ?? 'instance') === 'instance' && f.default !== undefined);
+  if (seeds.length) {
+    const row = db.prepare('SELECT config FROM plugins WHERE id = ?').get(m.id) as { config?: string } | undefined;
+    let config: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(row?.config || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) config = parsed as Record<string, unknown>;
+    } catch {
+      config = {};
+    }
+    let changed = false;
+    for (const f of seeds) {
+      if (!(f.key in config)) {
+        config[f.key] = f.default;
+        changed = true;
+      }
+    }
+    if (changed) db.prepare('UPDATE plugins SET config = ? WHERE id = ?').run(JSON.stringify(config), m.id);
+  }
 }

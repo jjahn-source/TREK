@@ -186,6 +186,11 @@ const admin: TranslationStrings = {
   'admin.plugins.deactivated': 'Wtyczka została dezaktywowana',
   'admin.plugins.viewErrors': 'Pokaż dziennik błędów',
   'admin.plugins.errorLog': 'Dziennik błędów',
+  'admin.plugins.settings': 'Ustawienia',
+  'admin.plugins.settings.none': 'Ta wtyczka nie ma ustawień.',
+  'admin.plugins.settings.hint':
+    'Te ustawienia należą do tego serwera i dotyczą wszystkich. Pola wymagane są oznaczone *.',
+  'admin.plugins.settings.restartNote': 'Zapisanie uruchamia wtyczkę ponownie, aby pobrała nowe wartości.',
   'admin.plugins.allowedHosts': 'Dozwolone hosty',
   'admin.plugins.allowedHosts.hint':
     'Ta wtyczka łączy się z usługą, którą tylko Ty możesz wskazać (serwer self-hosted). Dodaj hosty, do których może sięgać — do innych nie sięgnie.',
